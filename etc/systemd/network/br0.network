@@ -1,0 +1,16 @@
+[Match]
+Name=br0
+
+[Network]
+Address=192.168.200.1/24
+IPMasquerade=ipv4
+DHCPServer=yes
+
+[DHCPServer]
+PoolOffset=15
+PoolSize=5
+EmitDNS=no
+DNS=192.168.200.1
+
+#[Link]
+#MACAddress=02:5e:82:1c:39:4f

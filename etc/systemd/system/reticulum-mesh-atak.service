@@ -1,0 +1,19 @@
+[Unit]
+Description=Reticulum Mesh ATAK Handler
+After=reticulum-mesh-reticulum.service
+Requires=reticulum-mesh-reticulum.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+SupplementaryGroups=dialout
+WorkingDirectory=/home/natak/reticulum_mesh/tak_transmission/atak_module
+Environment=PYTHONPATH=/home/natak/reticulum_mesh
+Environment=HOME=/home/natak
+ExecStart=/usr/bin/python3 -u atak_handler.py
+Restart=always
+RestartSec=7
+
+[Install]
+WantedBy=multi-user.target

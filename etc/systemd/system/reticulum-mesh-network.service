@@ -1,0 +1,16 @@
+[Unit]
+Description=Reticulum Mesh Network Setup
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+    sleep 5 && \
+    /home/natak/mesh/macsec.sh && \
+    sleep 5 && \
+    /home/natak/mesh/batmesh.sh'
+
+[Install]
+WantedBy=multi-user.target

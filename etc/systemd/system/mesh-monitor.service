@@ -1,0 +1,18 @@
+[Unit]
+Description=Mesh Monitor Web Interface
+After=reticulum-mesh-rns-monitor.service
+Requires=reticulum-mesh-rns-monitor.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/natak/mesh_monitor
+Environment=PYTHONPATH=/home/natak
+Environment=HOME=/home/natak
+ExecStart=/bin/bash -c 'sleep 15 && /usr/bin/python3 -u app.py'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

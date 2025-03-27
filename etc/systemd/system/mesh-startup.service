@@ -1,0 +1,14 @@
+[Unit]
+Description=Mesh Network and Monitor
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=sleep 5
+ExecStart=/bin/bash -c '/home/natak/mesh/macsec.sh && sleep 5 && /home/natak/mesh/batmesh.sh && sleep 5 && cd /home/natak/mesh_monitor && python3 app.py'
+
+
+[Install]
+WantedBy=multi-user.target

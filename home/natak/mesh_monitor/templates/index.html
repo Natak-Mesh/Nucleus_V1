@@ -1,0 +1,492 @@
+ <!DOCTYPE html>
+<html>
+<head>
+    <title>Mesh Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --danger-color: #ff4500;
+            --warning-bg: #fff3cd;
+            --warning-text: #856404;
+            --shadow-color: rgba(0,0,0,0.1);
+            --warning-bg-light: rgba(255, 69, 0, 0.05);
+            --warning-border: rgba(255, 69, 0, 0.2);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #1a1a1a;
+                --card-background: #2d2d2d;
+                --text-primary: #ffffff;
+                --text-secondary: #cccccc;
+                --shadow-color: rgba(0,0,0,0.3);
+            --warning-bg-light: rgba(255, 69, 0, 0.1);
+            --warning-border: rgba(255, 69, 0, 0.3);
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            -webkit-tap-highlight-color: transparent;
+        }
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-background);
+            padding: 12px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .connection-indicator.online {
+            background-color: #4caf50;
+        }
+
+        .connection-indicator.offline {
+            background-color: var(--danger-color);
+        }
+
+        .header {
+            margin-top: 56px;
+            padding: 16px;
+            background: var(--card-background);
+            box-shadow: 0 2px 4px var(--shadow-color);
+        }
+
+        .local-info {
+            margin: 10px 0;
+        }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            padding: 8px;
+        }
+
+        .stat-item {
+            background: var(--card-background);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            z-index: 100;
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading .fab::after {
+            content: "";
+            width: 24px;
+            height: 24px;
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .content {
+            padding: 16px;
+            margin-bottom: 80px;
+        }
+
+        .node-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .node-card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            transition: all 0.2s ease;
+        }
+
+        .node-card.high-latency {
+            background-color: var(--warning-bg-light);
+            border: 1px solid var(--warning-border);
+        }
+
+        .node-card.expanded {
+            transform: scale(1.02);
+        }
+
+        .reticulum-card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: 16px;
+        }
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--shadow-color);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .value {
+            color: var(--text-primary);
+        }
+
+        .error-message {
+            color: var(--danger-color);
+            text-align: center;
+            padding: 20px;
+            background: var(--card-background);
+            border-radius: 8px;
+            margin: 16px;
+        }
+
+        .high-latency {
+            color: var(--danger-color);
+            font-weight: 500;
+        }
+
+        .warning {
+            background-color: var(--warning-bg);
+            color: var(--warning-text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
+
+        h3 {
+            color: var(--text-secondary);
+            margin: 24px 0 16px 0;
+            font-size: 1.1em;
+        }
+
+        .force-announce-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            margin: 16px 0;
+            cursor: pointer;
+            font-weight: 500;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .force-announce-btn:active {
+            transform: scale(0.98);
+        }
+
+        .stale {
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .stale-text {
+            color: var(--danger-color);
+        }
+
+        /* Pull to refresh styles */
+        .ptr-element {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            color: var(--text-secondary);
+            text-align: center;
+            transform: translate3d(0, -100%, 0);
+        }
+    </style>
+</head>
+<body>
+    <div class="status-bar">
+        <div>
+            <span class="connection-indicator online" id="connectionStatus"></span>
+            <span id="lastUpdate">Updated: Just now</span>
+        </div>
+        <div>{{ hostname }}</div>
+    </div>
+
+    <div class="header">
+        <div class="quick-stats">
+            <div class="stat-item">
+                <div class="label">WLAN MAC</div>
+                <div class="value" id="wlanMac">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">IP Address</div>
+                <div class="value" id="localIp">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">Connected Nodes</div>
+                <div class="value" id="nodeCount">-</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div id="nodeContent"></div>
+    </div>
+
+    <button class="fab" id="refreshButton" onclick="fetchMeshData()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+    </button>
+
+    <script>
+        let isLoading = false;
+        let lastTouchY = 0;
+        let pullStarted = false;
+        
+        // Pull to refresh handlers
+        document.addEventListener('touchstart', e => {
+            if (window.scrollY === 0) {
+                lastTouchY = e.touches[0].clientY;
+                pullStarted = true;
+            }
+        });
+
+        document.addEventListener('touchmove', e => {
+            if (!pullStarted) return;
+            
+            const touchY = e.touches[0].clientY;
+            const pull = touchY - lastTouchY;
+            
+            if (pull > 70) {
+                pullStarted = false;
+                fetchMeshData();
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            pullStarted = false;
+        });
+
+        function updateLastSeen() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = 
+                `Updated: ${now.toLocaleTimeString()}`;
+        }
+
+        function updateNodeCount(nodes) {
+            document.getElementById('nodeCount').textContent = nodes.length;
+        }
+
+        function fetchMeshData() {
+            if (isLoading) return;
+            
+            isLoading = true;
+            const refreshButton = document.getElementById('refreshButton');
+            refreshButton.classList.add('loading');
+
+            fetch('/get_mesh_data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Received data:", data);  // Debug log
+                    if (data.success) {
+                        document.getElementById('wlanMac').textContent = data.local_info.wlan_mac;
+                        document.getElementById('localIp').textContent = data.local_info.ip;
+                        displayMeshData(data.nodes, data.reticulum_peers);
+                        updateNodeCount(data.nodes);
+                        updateLastSeen();
+                    } else {
+                        document.getElementById('nodeContent').innerHTML = 
+                            `<div class="error-message">Error: ${data.error}</div>`;
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('nodeContent').innerHTML = 
+                        `<div class="error-message">Error: ${error}</div>`;
+                })
+                .finally(() => {
+                    isLoading = false;
+                    refreshButton.classList.remove('loading');
+                });
+        }
+
+        function displayMeshData(nodes, reticulumPeers) {
+            let html = '<h3>Wi-Fi Connections</h3>';
+            html += '<div class="node-cards">';
+            nodes.forEach(node => {
+                const isHighLatency = node.last_seen > 20;
+                const cardId = `node-${node.mac.replace(/:/g, '')}`;
+                
+                html += `
+                    <div class="node-card ${isHighLatency ? 'high-latency' : ''}" id="${cardId}" onclick="toggleNodeDetails(this)">
+                        <div class="info-item">
+                            <span class="label">Hostname:</span>
+                            <span class="value">${node.hostname}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">MAC:</span>
+                            <span class="value">${node.mac}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">IP:</span>
+                            <span class="value">${node.ip}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Mode:</span>
+                            <span class="value">${node.mode || 'Unknown'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Throughput:</span>
+                            <span class="value">${node.throughput} Mbps</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Last Seen:</span>
+                            <span class="value ${isHighLatency ? 'high-latency' : ''}">${node.last_seen.toFixed(2)}s
+                                ${isHighLatency ? '<span class="warning">High Latency</span>' : ''}
+                            </span>
+                        </div>
+                        <div class="info-item details" style="display: none;">
+                            <span class="label">Next Hop:</span>
+                            <span class="value">${node.nexthop}</span>
+                        </div>
+                    </div>`;
+            });
+            html += '</div>';
+
+            // Add Reticulum peers section
+            html += '<h3>Reticulum Peers</h3>';
+            
+            if (Object.keys(reticulumPeers).length > 0) {
+                for (const [hash, hostname] of Object.entries(reticulumPeers)) {
+                    // Strip angle brackets from hash
+                    const cleanHash = hash.replace(/[<>]/g, '');
+                    html += `
+                        <div class="reticulum-card">
+                            <div class="info-item">
+                                <span class="label">Hostname:</span>
+                                <span class="value">${hostname.name || hostname}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Last Seen:</span>
+                                <span class="value">${formatTimeDiff(hostname.last_seen)}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Hash:</span>
+                                <span class="value">${cleanHash}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">RSSI:</span>
+                                <span class="value">${hostname.rssi !== undefined ? hostname.rssi + ' dBm' : 'N/A'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">SNR:</span>
+                                <span class="value">${hostname.snr !== undefined ? hostname.snr + ' dB' : 'N/A'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Hops:</span>
+                                <span class="value">${hostname.hops !== undefined ? hostname.hops : 'N/A'}</span>
+                            </div>
+                        </div>`;
+                }
+            } else {
+                html += '<div class="reticulum-card"><div class="info-item">No peers found</div></div>';
+            }
+            
+            document.getElementById('nodeContent').innerHTML = html;
+        }
+
+        function toggleNodeDetails(card) {
+            const details = card.querySelectorAll('.details');
+            const isExpanded = card.classList.contains('expanded');
+            
+            card.classList.toggle('expanded');
+            details.forEach(detail => {
+                detail.style.display = isExpanded ? 'none' : 'flex';
+            });
+        }
+
+        // Copy to clipboard functionality
+        document.getElementById('wlanMac').addEventListener('click', function() {
+            navigator.clipboard.writeText(this.textContent)
+                .then(() => {
+                    const originalText = this.textContent;
+                    this.textContent = 'Copied!';
+                    setTimeout(() => this.textContent = originalText, 1000);
+                });
+        });
+
+        document.getElementById('localIp').addEventListener('click', function() {
+            navigator.clipboard.writeText(this.textContent)
+                .then(() => {
+                    const originalText = this.textContent;
+                    this.textContent = 'Copied!';
+                    setTimeout(() => this.textContent = originalText, 1000);
+                });
+        });
+
+        function formatTimeDiff(seconds) {
+            if (seconds < 60) {
+                return `${seconds}s ago`;
+            } else if (seconds < 3600) {
+                return `${Math.floor(seconds/60)}m ago`;
+            } else {
+                return `${Math.floor(seconds/3600)}h ago`;
+            }
+        }
+
+
+        // Initial load
+        fetchMeshData();
+    </script>
+</body>
+</html>

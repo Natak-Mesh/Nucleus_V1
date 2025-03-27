@@ -1,0 +1,17 @@
+[Unit]
+Description=Reticulum Mesh Controller
+After=reticulum-mesh-network.service reticulum-mesh-ogm.service reticulum-mesh-identity.service
+Requires=reticulum-mesh-network.service reticulum-mesh-ogm.service reticulum-mesh-identity.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/natak/reticulum_mesh/mesh_controller
+ExecStartPre=/bin/sleep 7
+ExecStart=/usr/bin/python3 mesh_controller.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
