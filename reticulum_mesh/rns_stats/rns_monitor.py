@@ -125,18 +125,7 @@ class AnnounceHandler:
                 except:
                     pass
             
-            # Add RSSI and SNR information if available
-            if announce_packet_hash and self.parent and self.parent.reticulum.is_connected_to_shared_instance:
-                rssi = self.parent.reticulum.get_packet_rssi(announce_packet_hash)
-                snr = self.parent.reticulum.get_packet_snr(announce_packet_hash)
-                
-                if rssi is not None:
-                    peer_info["rssi"] = rssi
-                    self.logger.debug(f"RSSI for {dest_hash_str}: {rssi} dBm")
-                
-                if snr is not None:
-                    peer_info["snr"] = snr
-                    self.logger.debug(f"SNR for {dest_hash_str}: {snr} dB")
+            # RSSI and SNR information removed as it's not available from packets
             
             # Store or update peer information
             self.known_peers[dest_hash_str] = peer_info

@@ -1,15 +1,19 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, Response
 import socket
 import json
 import os
 import time
 import logging
+from functools import partial
 
 app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Configuration
+UPDATE_INTERVAL = 1  # Update interval in seconds
 
 # File paths
 NODE_MODES_PATH = '/home/natak/reticulum_mesh/mesh_controller/node_modes.json'
@@ -26,7 +30,7 @@ file_cache = {
 }
 
 # Cache expiration time in seconds
-CACHE_EXPIRATION = 5
+CACHE_EXPIRATION = UPDATE_INTERVAL
 
 def read_json_file(file_path, cache_key):
     """Read a JSON file with caching and error handling"""
@@ -190,5 +194,41 @@ def get_mesh_data():
         'reticulum_peers': reticulum_peers
     })
 
+def generate_events():
+    """Generate SSE events with mesh data"""
+    while True:
+        try:
+            # Get current mesh data
+            data = {
+                'success': True,
+                'error': None,
+                'local_info': get_local_info(),
+                'nodes': process_wifi_nodes(),
+                'reticulum_peers': process_reticulum_peers()
+            }
+            
+            # Send the event
+            yield f"data: {json.dumps(data)}\n\n"
+            
+            # Wait for next update
+            time.sleep(UPDATE_INTERVAL)
+            
+        except Exception as e:
+            app.logger.error(f"Error generating event: {e}")
+            yield f"data: {json.dumps({'success': False, 'error': str(e)})}\n\n"
+            time.sleep(UPDATE_INTERVAL)
+
+@app.route('/events')
+def events():
+    """SSE endpoint for real-time updates"""
+    return Response(
+        generate_events(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
+    )
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

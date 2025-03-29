@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <title>Mesh Monitor</title>
@@ -93,42 +93,6 @@
             text-align: center;
         }
 
-        .fab {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            box-shadow: 0 4px 8px var(--shadow-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.2s;
-            z-index: 100;
-        }
-
-        .fab:active {
-            transform: scale(0.95);
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading .fab::after {
-            content: "";
-            width: 24px;
-            height: 24px;
-            border: 2px solid transparent;
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
         .content {
             padding: 16px;
             margin-bottom: 80px;
@@ -283,82 +247,50 @@
         <div id="nodeContent"></div>
     </div>
 
-    <button class="fab" id="refreshButton" onclick="fetchMeshData()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-        </svg>
-    </button>
 
     <script>
-        let isLoading = false;
-        let lastTouchY = 0;
-        let pullStarted = false;
-        
-        // Pull to refresh handlers
-        document.addEventListener('touchstart', e => {
-            if (window.scrollY === 0) {
-                lastTouchY = e.touches[0].clientY;
-                pullStarted = true;
+        let eventSource = null;
+
+        function connectEventSource() {
+            if (eventSource) {
+                eventSource.close();
             }
-        });
 
-        document.addEventListener('touchmove', e => {
-            if (!pullStarted) return;
+            eventSource = new EventSource('/events');
             
-            const touchY = e.touches[0].clientY;
-            const pull = touchY - lastTouchY;
-            
-            if (pull > 70) {
-                pullStarted = false;
-                fetchMeshData();
-            }
-        });
-
-        document.addEventListener('touchend', () => {
-            pullStarted = false;
-        });
-
-        function updateLastSeen() {
-            const now = new Date();
-            document.getElementById('lastUpdate').textContent = 
-                `Updated: ${now.toLocaleTimeString()}`;
-        }
-
-        function updateNodeCount(nodes) {
-            document.getElementById('nodeCount').textContent = nodes.length;
-        }
-
-        function fetchMeshData() {
-            if (isLoading) return;
-            
-            isLoading = true;
-            const refreshButton = document.getElementById('refreshButton');
-            refreshButton.classList.add('loading');
-
-            fetch('/get_mesh_data')
-                .then(response => response.json())
-                .then(data => {
-                    console.log("Received data:", data);  // Debug log
-                    if (data.success) {
-                        document.getElementById('wlanMac').textContent = data.local_info.wlan_mac;
-                        document.getElementById('localIp').textContent = data.local_info.ip;
-                        displayMeshData(data.nodes, data.reticulum_peers);
-                        updateNodeCount(data.nodes);
-                        updateLastSeen();
-                    } else {
-                        document.getElementById('nodeContent').innerHTML = 
-                            `<div class="error-message">Error: ${data.error}</div>`;
-                    }
-                })
-                .catch(error => {
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.success) {
+                    document.getElementById('wlanMac').textContent = data.local_info.wlan_mac;
+                    document.getElementById('localIp').textContent = data.local_info.ip;
+                    document.getElementById('nodeCount').textContent = data.nodes.length;
+                    displayMeshData(data.nodes, data.reticulum_peers);
+                    document.getElementById('lastUpdate').textContent = 
+                        `Updated: ${new Date().toLocaleTimeString()}`;
+                    document.getElementById('connectionStatus').className = 
+                        'connection-indicator online';
+                } else {
                     document.getElementById('nodeContent').innerHTML = 
-                        `<div class="error-message">Error: ${error}</div>`;
-                })
-                .finally(() => {
-                    isLoading = false;
-                    refreshButton.classList.remove('loading');
-                });
+                        `<div class="error-message">Error: ${data.error}</div>`;
+                }
+            };
+
+            eventSource.onerror = function() {
+                document.getElementById('connectionStatus').className = 
+                    'connection-indicator offline';
+                // Try to reconnect in 5 seconds
+                setTimeout(connectEventSource, 5000);
+            };
         }
+
+        // Handle page visibility
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                eventSource?.close();
+            } else {
+                connectEventSource();
+            }
+        });
 
         function displayMeshData(nodes, reticulumPeers) {
             let html = '<h3>Wi-Fi Connections</h3>';
@@ -425,14 +357,6 @@
                                 <span class="value">${cleanHash}</span>
                             </div>
                             <div class="info-item">
-                                <span class="label">RSSI:</span>
-                                <span class="value">${hostname.rssi !== undefined ? hostname.rssi + ' dBm' : 'N/A'}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">SNR:</span>
-                                <span class="value">${hostname.snr !== undefined ? hostname.snr + ' dB' : 'N/A'}</span>
-                            </div>
-                            <div class="info-item">
                                 <span class="label">Hops:</span>
                                 <span class="value">${hostname.hops !== undefined ? hostname.hops : 'N/A'}</span>
                             </div>
@@ -485,8 +409,8 @@
         }
 
 
-        // Initial load
-        fetchMeshData();
+        // Initial connection
+        connectEventSource();
     </script>
 </body>
 </html>

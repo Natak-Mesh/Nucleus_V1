@@ -18,8 +18,12 @@ mkdir -p "$CLEAN_REPO_DIR/etc/systemd/network"
 mkdir -p "$CLEAN_REPO_DIR/home/natak/mesh"
 mkdir -p "$CLEAN_REPO_DIR/home/natak/mesh_monitor/templates"
 mkdir -p "$CLEAN_REPO_DIR/home/natak/macsec_config_tool"
+mkdir -p "$CLEAN_REPO_DIR/home/natak/.reticulum"
 
 echo "Copying files..."
+
+# Copy Reticulum config
+cp -v /home/natak/.reticulum/config "$CLEAN_REPO_DIR/home/natak/.reticulum/"
 
 # Copy only the files you want to keep
 # Mesh files
