@@ -80,25 +80,37 @@ def get_reticulum_status():
     return rns_data.get('peers', {})
 
 def get_local_info():
-    """Get local node information from identity_map.json"""
+    """Get local node information from identity_map.json and rns_status.json"""
     local_hostname = socket.gethostname()
     identity_map = get_identity_map()
+    # Find MAC and IP from identity map
+    local_info = {
+        'wlan_mac': 'Unknown',
+        'bat_mac': 'Unknown',
+        'ip': 'Unknown',
+        'hostname': local_hostname,
+        'hash': 'Unknown'
+    }
     
-    # Find the entry for the local hostname
+    # Get MAC and IP
     for mac, node_info in identity_map.items():
         if node_info.get('hostname') == local_hostname:
-            return {
+            local_info.update({
                 'wlan_mac': mac,
                 'bat_mac': mac,  # Using the same MAC for both since we don't have separate batman MAC
                 'ip': node_info.get('ip', 'Unknown')
-            }
+            })
+            break
     
-    # Fallback if not found
-    return {
-        'wlan_mac': 'Unknown',
-        'bat_mac': 'Unknown',
-        'ip': 'Unknown'
-    }
+    # Get hash from RNS status (get raw data, not just peers)
+    rns_data = read_json_file(RNS_STATUS_PATH, 'rns_status')
+    for hash_id, peer_data in rns_data.get('peers', {}).items():
+        if peer_data.get('hostname', 'Unknown') == local_hostname:
+            # Remove angle brackets from hash
+            local_info['hash'] = hash_id.replace('<', '').replace('>', '')
+            break
+    
+    return local_info
 
 def process_wifi_nodes():
     """Process WiFi nodes data from status.json and map to hostnames"""

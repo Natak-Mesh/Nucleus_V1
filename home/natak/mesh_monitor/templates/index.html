@@ -264,7 +264,7 @@
                     document.getElementById('wlanMac').textContent = data.local_info.wlan_mac;
                     document.getElementById('localIp').textContent = data.local_info.ip;
                     document.getElementById('nodeCount').textContent = data.nodes.length;
-                    displayMeshData(data.nodes, data.reticulum_peers);
+                    displayMeshData(data.nodes, data.reticulum_peers, data.local_info);
                     document.getElementById('lastUpdate').textContent = 
                         `Updated: ${new Date().toLocaleTimeString()}`;
                     document.getElementById('connectionStatus').className = 
@@ -292,7 +292,7 @@
             }
         });
 
-        function displayMeshData(nodes, reticulumPeers) {
+        function displayMeshData(nodes, reticulumPeers, localInfo) {
             let html = '<h3>Wi-Fi Connections</h3>';
             html += '<div class="node-cards">';
             nodes.forEach(node => {
@@ -308,6 +308,10 @@
                         <div class="info-item">
                             <span class="label">MAC:</span>
                             <span class="value">${node.mac}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Next Hop:</span>
+                            <span class="value">${node.nexthop}</span>
                         </div>
                         <div class="info-item">
                             <span class="label">IP:</span>
@@ -327,15 +331,25 @@
                                 ${isHighLatency ? '<span class="warning">High Latency</span>' : ''}
                             </span>
                         </div>
-                        <div class="info-item details" style="display: none;">
-                            <span class="label">Next Hop:</span>
-                            <span class="value">${node.nexthop}</span>
-                        </div>
                     </div>`;
             });
             html += '</div>';
 
             // Add Reticulum peers section
+            // Add Local Node Reticulum Info
+            html += `
+                <div class="reticulum-card">
+                    <div class="info-item">
+                        <span class="label">Local Node:</span>
+                        <span class="value">${localInfo.hostname}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Hash:</span>
+                        <span class="value">${localInfo.hash}</span>
+                    </div>
+                </div>
+            `;
+
             html += '<h3>Reticulum Peers</h3>';
             
             if (Object.keys(reticulumPeers).length > 0) {
