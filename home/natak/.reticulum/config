@@ -1,0 +1,41 @@
+# This is the default Reticulum config file.
+# You should probably edit it to include any additional,
+# interfaces and settings you might need.
+
+[reticulum]
+  enable_transport = True
+  share_instance = Yes
+  instance_socket_path = /tmp/reticulum.sock
+  shared_instance_port = 37428
+  instance_control_port = 37429
+  panic_on_interface_error = No
+
+[logging]
+  loglevel = 4
+
+[interfaces]
+  [[Default Interface]]
+    type = AutoInterface
+    enabled = No
+    devices = wlan1
+    network_name = mesh_net
+    bitrate = 10000000  # 10 Mbps for WiFi
+
+  [[RNode LoRa Interface]]
+    type = RNodeInterface
+    interface_enabled = True
+    network_name = mesh_net
+    port = /dev/ttyACM0
+    frequency = 915000000
+    bandwidth = 125000
+    txpower = 20
+    spreadingfactor = 10
+    codingrate = 5
+    mode = full
+    bitrate = 1300  # 1.3 kbps for typical LoRa config
+
+  [[TCP Server Interface]]
+    type = TCPServerInterface
+    interface_enabled = no
+    listen_ip = 0.0.0.0  # Listen on all interfaces
+    listen_port = 4242   # Choose any port you like
