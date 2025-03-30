@@ -18,6 +18,10 @@ ANNOUNCE_INTERVAL = 60  # 1 minute
 PEER_TIMEOUT = 300      # 5 minutes
 STARTUP_DELAY = 10      # 10 seconds for LoRa radio
 
+# Retry Configuration
+PACKET_TIMEOUT = 5      # seconds to wait for delivery proof
+MAX_RETRIES = 3         # maximum number of retry attempts
+
 class ReticulumHandler:
     def __init__(self):
         # Set up logging
@@ -33,16 +37,19 @@ class ReticulumHandler:
         self.incoming_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/incoming"
         self.pending_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/pending"
         self.processing_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/processing"
+        self.sent_buffer_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/sent_buffer"
         
         # Ensure directories exist
         os.makedirs(self.incoming_dir, exist_ok=True)
         os.makedirs(self.pending_dir, exist_ok=True)
         os.makedirs(self.processing_dir, exist_ok=True)
+        os.makedirs(self.sent_buffer_dir, exist_ok=True)
         
         # Runtime state
         self.hostname = socket.gethostname()
         self.peer_map = {}  # hostname -> destination
         self.last_seen = {} # hostname -> timestamp
+        self.packet_map = {} # packet_hash -> filename
         self.should_quit = False
         self.message_loops_running = False
         self.message_threads = []
@@ -224,12 +231,16 @@ class ReticulumHandler:
                             receipt = packet.send()
                             if receipt:
                                 self.logger.info(f"Sent {oldest_file} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
-                                receipt.set_timeout(5)
+                                
+                                # Move to sent_buffer and track packet
+                                sent_path = os.path.join(self.sent_buffer_dir, oldest_file)
+                                os.rename(processing_path, sent_path)
+                                self.packet_map[receipt.hash] = oldest_file
+                                
+                                # Set callbacks with configured timeout
+                                receipt.set_timeout(PACKET_TIMEOUT)
                                 receipt.set_delivery_callback(self.delivery_confirmed)
                                 receipt.set_timeout_callback(self.delivery_failed)
-                
-                # Remove file from processing directory
-                os.remove(processing_path)
                 
             except Exception as e:
                 self.logger.error(f"Error processing outgoing message: {e}")
@@ -254,10 +265,50 @@ class ReticulumHandler:
     def delivery_confirmed(self, receipt):
         """Handle successful delivery confirmation"""
         self.logger.info(f"Got proof for packet {RNS.prettyhexrep(receipt.hash)} in {receipt.get_rtt():.3f}s")
+        
+        # Get filename and remove from sent_buffer
+        filename = self.packet_map.pop(receipt.hash, None)
+        if filename:
+            sent_path = os.path.join(self.sent_buffer_dir, filename)
+            if os.path.exists(sent_path):
+                os.remove(sent_path)
+                self.logger.info(f"Successfully delivered {filename}, removed from sent_buffer")
 
     def delivery_failed(self, receipt):
         """Handle delivery timeout"""
-        self.logger.info(f"No proof received for packet {RNS.prettyhexrep(receipt.hash)} after 5s")
+        self.logger.info(f"No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
+        
+        # Get filename and move back to pending for retry
+        filename = self.packet_map.pop(receipt.hash, None)
+        if filename:
+            sent_path = os.path.join(self.sent_buffer_dir, filename)
+            
+            # Check if this is already a retry
+            retry_count = 1
+            retry_match = re.search(r'_retry(\d+)\.zst$', filename)
+            if retry_match:
+                retry_count = int(retry_match.group(1)) + 1
+                # Remove the old retry suffix
+                base_filename = re.sub(r'_retry\d+\.zst$', '.zst', filename)
+            else:
+                # First retry
+                base_filename = filename
+                
+            # Check max retries
+            if retry_count > MAX_RETRIES:
+                self.logger.error(f"Max retries ({MAX_RETRIES}) reached for {filename}, dropping packet")
+                if os.path.exists(sent_path):
+                    os.remove(sent_path)
+                return
+                
+            # Add retry counter to filename
+            new_filename = base_filename.replace('.zst', f'_retry{retry_count}.zst')
+            pending_path = os.path.join(self.pending_dir, new_filename)
+            
+            if os.path.exists(sent_path):
+                # Move back to pending with updated filename
+                os.rename(sent_path, pending_path)
+                self.logger.info(f"Moved {filename} to {new_filename} for retry {retry_count}/{MAX_RETRIES}")
 
     def run(self):
         """Main program loop"""
