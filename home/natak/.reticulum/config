@@ -29,7 +29,9 @@
     frequency = 915000000
     bandwidth = 125000
     txpower = 20
-    spreadingfactor = 10
+    spreadingfactor = 8
+    persistence = 120
+    slottime = 20
     codingrate = 5
     mode = full
     bitrate = 1300  # 1.3 kbps for typical LoRa config
