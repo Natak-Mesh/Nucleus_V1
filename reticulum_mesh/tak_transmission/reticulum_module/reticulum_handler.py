@@ -223,6 +223,7 @@ class ReticulumHandler:
                             packet = RNS.Packet(outgoing_dest, file_data)
                             receipt = packet.send()
                             if receipt:
+                                self.logger.info(f"Sent {oldest_file} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
                                 receipt.set_timeout(5)
                                 receipt.set_delivery_callback(self.delivery_confirmed)
                                 receipt.set_timeout_callback(self.delivery_failed)

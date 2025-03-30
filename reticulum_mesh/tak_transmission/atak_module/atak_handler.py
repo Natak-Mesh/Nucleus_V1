@@ -221,8 +221,10 @@ class ATAKHandler:
         """Process an ATAK packet for transmission"""
         try:
             # Compress data using zstd
-            print(f"COMPRESS: TAK packet {len(data)} bytes")
+            print(f"OUTGOING PACKET: Received {len(data)} bytes")
             compressed = compress_cot_packet(data)
+            outgoing_hash = hashlib.md5(compressed).hexdigest()
+            print(f"HASH CHECK: Outgoing compressed data hash: {outgoing_hash}")
             if not compressed:
                 print("ERROR: Compression failed")
                 return
@@ -270,10 +272,13 @@ class ATAKHandler:
                     
                 path = f"{self.incoming_dir}/{filename}"
                 try:
+                    print(f"INCOMING PACKET: Processing {filename}")
                     # Read compressed data
                     with open(path, 'rb') as f:
                         compressed = f.read()
                     print(f"READ: {filename} ({len(compressed)} bytes)")
+                    incoming_hash = hashlib.md5(compressed).hexdigest()
+                    print(f"HASH CHECK: Incoming compressed data hash: {incoming_hash}")
                     
                     # Check for duplicates
                     if self.is_duplicate(compressed):
