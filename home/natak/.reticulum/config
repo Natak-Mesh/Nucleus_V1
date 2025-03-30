@@ -30,8 +30,9 @@
     bandwidth = 125000
     txpower = 20
     spreadingfactor = 8
-    persistence = 120
-    slottime = 20
+    # dont mess with below settings, looks like they trash the lora connection
+    # persistence = 120
+    # slottime = 20
     codingrate = 5
     mode = full
     bitrate = 1300  # 1.3 kbps for typical LoRa config
