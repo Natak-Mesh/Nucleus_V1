@@ -64,8 +64,9 @@ class ReticulumHandler:
             ASPECT
         )
         
-        # Set up packet callback
+        # Set up packet callback and enable proofs
         self.destination.set_packet_callback(self.message_received)
+        self.destination.set_proof_strategy(RNS.Destination.PROVE_ALL)
         
         # Set up announce handler
         self.announce_handler = AnnounceHandler(
@@ -215,9 +216,16 @@ class ReticulumHandler:
                                 ASPECT
                             )
                             
-                            # Send packet
+                            # Enable proofs on this outgoing destination
+                            outgoing_dest.set_proof_strategy(RNS.Destination.PROVE_ALL)
+                            
+                            # Send packet with proof tracking
                             packet = RNS.Packet(outgoing_dest, file_data)
-                            packet.send()
+                            receipt = packet.send()
+                            if receipt:
+                                receipt.set_timeout(5)
+                                receipt.set_delivery_callback(self.delivery_confirmed)
+                                receipt.set_timeout_callback(self.delivery_failed)
                 
                 # Remove file from processing directory
                 os.remove(processing_path)
@@ -241,6 +249,14 @@ class ReticulumHandler:
             self.logger.info(f"Received message, saved to {filename}")
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")
+
+    def delivery_confirmed(self, receipt):
+        """Handle successful delivery confirmation"""
+        self.logger.info(f"Got proof for packet {RNS.prettyhexrep(receipt.hash)} in {receipt.get_rtt():.3f}s")
+
+    def delivery_failed(self, receipt):
+        """Handle delivery timeout"""
+        self.logger.info(f"No proof received for packet {RNS.prettyhexrep(receipt.hash)} after 5s")
 
     def run(self):
         """Main program loop"""
