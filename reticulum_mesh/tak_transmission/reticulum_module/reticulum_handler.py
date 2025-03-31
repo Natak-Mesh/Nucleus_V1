@@ -233,15 +233,16 @@ class ReticulumHandler:
                             if receipt:
                                 self.logger.info(f"Sent {oldest_file} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
                                 
-                                # Move to sent_buffer and track packet
-                                sent_path = os.path.join(self.sent_buffer_dir, oldest_file)
-                                os.rename(processing_path, sent_path)
+                                # Track packet
                                 self.packet_map[receipt.hash] = oldest_file
                                 
                                 # Set callbacks with configured timeout
                                 receipt.set_timeout(PACKET_TIMEOUT)
                                 receipt.set_delivery_callback(self.delivery_confirmed)
                                 receipt.set_timeout_callback(self.delivery_failed)
+                # Move to sent_buffer after sending to all targets
+                sent_path = os.path.join(self.sent_buffer_dir, oldest_file)
+                os.rename(processing_path, sent_path)
                 
             except Exception as e:
                 self.logger.error(f"Error processing outgoing message: {e}")
