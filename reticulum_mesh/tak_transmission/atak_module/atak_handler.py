@@ -100,12 +100,12 @@ class MulticastSocketManager:
             self.cleanup_socket(addr, port)
 
 # ATAK multicast addresses and ports
-# Both output (send) and input (receive) ports
-MULTICAST_ADDRS = ["224.10.10.1", "224.10.10.1", "239.2.3.1", "239.2.3.1", "239.5.5.55", "239.5.5.55"]
-MULTICAST_PORTS = [17012, 17013, 6969, 6970, 7171, 7172]
+# Input (receive) ports
+MULTICAST_ADDRS = ["224.10.10.1", "239.2.3.1"]
+MULTICAST_PORTS = [17012, 6970]
 
 # Define which ports are for output (locally generated packets)
-OUTPUT_PORTS = [17012, 6969, 7171]
+OUTPUT_PORTS = [17012, 6970]
 
 class ATAKHandler:
     def __init__(self, shared_dir: str = "/home/natak/reticulum_mesh/tak_transmission/shared"):
@@ -265,20 +265,20 @@ class ATAKHandler:
             print(f"ERROR: Processing packet failed: {e}")
 
     def forward_to_atak(self, data: bytes) -> None:
-        """Forward packet to ATAK multicast addresses (input ports only)"""
+        """Forward packet to ATAK multicast addresses (output ports)"""
         success_count = 0
         
-        # Define input ports (non-output ports)
-        INPUT_PORTS = [17013, 6970, 7172]
+        # Define output addresses and ports for forwarding
+        OUTPUT_ADDRS = ["224.10.10.1", "239.2.3.1"]
+        OUTPUT_PORTS = [17013, 6971]
         
-        # Only forward to input ports
-        for i, (addr, port) in enumerate(zip(MULTICAST_ADDRS, MULTICAST_PORTS)):
-            if port in INPUT_PORTS:
-                if self.socket_manager.send_packet(data, addr, port):
-                    success_count += 1
-                    print(f"FORWARD: {len(data)} bytes to {addr}:{port} (input port)")
+        # Forward to output ports
+        for addr, port in zip(OUTPUT_ADDRS, OUTPUT_PORTS):
+            if self.socket_manager.send_packet(data, addr, port):
+                success_count += 1
+                print(f"FORWARD: {len(data)} bytes to {addr}:{port} (output port)")
         
-        print(f"Successfully forwarded to {success_count}/{len(INPUT_PORTS)} input multicast addresses")
+        print(f"Successfully forwarded to {success_count}/{len(OUTPUT_PORTS)} output multicast addresses")
 
     def process_incoming(self) -> None:
         """Process packets in the incoming directory"""
