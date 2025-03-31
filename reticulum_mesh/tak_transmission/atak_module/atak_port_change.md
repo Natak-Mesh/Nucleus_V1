@@ -2,95 +2,73 @@
 
 ## Current Configuration
 
-### Current Multicast Ports
-The ATAKHandler currently listens on the following multicast addresses and ports:
+The ATAKHandler now implements a one-way flow system to prevent packet loops by separating output and input channels.
+
+### Multicast Ports
+The ATAKHandler listens on the following multicast addresses and ports:
 
 | Purpose | Multicast Address | Port |
 |---------|------------------|------|
-| CoT Messages | 224.10.10.1 | 17012 |
-| SA Multicast | 239.2.3.1 | 6969 |
-| Additional Channel | 239.5.5.55 | 7171 |
-
-### Current ATAK Configuration
-All ATAK devices are currently configured to both send and receive on these same ports:
-- CoT Output/Input: 224.10.10.1:17012:udp
-- SA Multicast Output/Input: 239.2.3.1:6969:udp
-- Additional Channel Output/Input: 239.5.5.55:7171:udp
+| Chat Messages | 224.10.10.1 | 17012 |
+| SA Multicast | 239.2.3.1 | 6970 |
 
 ## Problem Statement
 
-The current configuration causes excessive traffic to takNode2 because:
+The previous configuration caused potential looping behavior because:
 
-1. Each position update is being forwarded twice to takNode2 (once by takNode1 and once by takNode3)
-2. We cannot distinguish between locally generated packets and packets received from other nodes
-3. This creates a "triangle problem" where takNode2 receives duplicate information
-4. The slow LoRa link (1.3 kbps) cannot handle this volume of traffic, causing extreme lag
+1. Both ATAK devices and nodes were using the same ports for input and output
+2. This made it impossible to distinguish between locally generated packets and packets received from other nodes
+3. Could potentially create feedback loops in the network
+4. Inefficient use of network resources
 
-## Proposed Solution
+## Implemented Solution
 
-### New Port Configuration
-We will separate the output and input ports to distinguish between locally generated packets and packets from other nodes:
+We've created a new multicast channel configuration that separates local outgoing packets from incoming packets. Reticulum now reads from dedicated output ports and only writes to specific incoming ports in ATAK, preventing any potential looping behavior.
+
+### Port Configuration
 
 | Purpose | Direction | Multicast Address | Port |
 |---------|-----------|------------------|------|
-| CoT Messages | Output (Send) | 224.10.10.1 | 17012 |
-| CoT Messages | Input (Receive) | 224.10.10.1 | 17013 |
-| SA Multicast | Output (Send) | 239.2.3.1 | 6969 |
-| SA Multicast | Input (Receive) | 239.2.3.1 | 6970 |
-| Additional Channel | Output (Send) | 239.5.5.55 | 7171 |
-| Additional Channel | Input (Receive) | 239.5.5.55 | 7172 |
+| Chat Messages | Listen (Output) | 224.10.10.1 | 17012 |
+| Chat Messages | Forward to (Input) | 224.10.10.1 | 17013 |
+| SA Multicast | Listen (Output) | 239.2.3.1 | 6970 |
+| SA Multicast | Forward to (Input) | 239.2.3.1 | 6971 |
 
-### New ATAK Configuration
-All ATAK devices will be configured with:
-- CoT Output: 224.10.10.1:17012:udp
-- CoT Input: 224.10.10.1:17013:udp
-- SA Multicast Output: 239.2.3.1:6969:udp
-- SA Multicast Input: 239.2.3.1:6970:udp
-- Additional Channel Output: 239.5.5.55:7171:udp
-- Additional Channel Input: 239.5.5.55:7172:udp
+### ATAK EUD Configuration
+ATAK devices must be configured with:
 
-## Implementation Steps
+In "Manage Outputs" section:
+- Chat Output: 224.10.10.1:17012:udp
+- SA Multicast Output: 239.2.3.1:6970:udp
 
-1. **Update ATAK Configuration**:
-   - Configure all ATAK devices to use the new port configuration
-   - Ensure that output ports are different from input ports
+In "Manage Inputs" section:
+- Chat Input: 224.10.10.1:17013:udp
+- SA Multicast Input: 239.2.3.1:6971:udp
 
-2. **Modify ATAKHandler**:
-   - Update the code to listen on all ports (both output and input)
-   - Add logic to only forward packets received on output ports (locally generated)
-   - Skip forwarding packets received on input ports (from other nodes)
+## Implementation Details
 
-3. **Code Changes Required**:
-   ```python
-   # Update multicast addresses and ports
-   MULTICAST_ADDRS = ["224.10.10.1", "224.10.10.1", "239.2.3.1", "239.2.3.1", "239.5.5.55", "239.5.5.55"]
-   MULTICAST_PORTS = [17012, 17013, 6969, 6970, 7171, 7172]
-   
-   # Define which ports are for output (locally generated packets)
-   OUTPUT_PORTS = [17012, 6969, 7171]
-   
-   # In process_packet method
-   def process_packet(self, data, src, addr, port):
-       # Only forward packets from output ports (locally generated)
-       if port in OUTPUT_PORTS:
-           # Compress and write to pending directory
-           print(f"FORWARDING: Local packet from output port {port}")
-       else:
-           # Skip forwarding
-           print(f"SKIPPING: Remote packet from input port {port}")
-   ```
+1. **ATAKHandler Changes**:
+   - Listens only on output ports (17012, 6970)
+   - Forwards decompressed packets to input ports (17013, 6971)
+   - Removed unused 239.5.5.55 addresses
+
+2. **Packet Flow**:
+   - Local ATAK packets are sent to output ports
+   - ATAKHandler receives these packets
+   - After processing/compression, packets are forwarded to input ports
+   - ATAK receives processed packets on input ports
 
 ## Benefits
 
-1. **Reduced Traffic**: Each position update will be forwarded only once to takNode2
-2. **Automatic Operation**: No manual configuration needed for each node
-3. **Resilient to Changes**: Works regardless of IP address changes
-4. **No Packet Parsing**: Doesn't require parsing ATAK packet content
-5. **Improved Performance**: Significantly reduces lag on takNode2's LoRa connection
+1. **Clean Separation**: Clear distinction between outgoing and incoming packets
+2. **Loop Prevention**: One-way flow prevents packet feedback loops
+3. **Efficient Processing**: Each packet follows a clear path through the system
+4. **Simple Configuration**: Clear separation of input/output ports in ATAK configuration
+5. **Reduced Network Load**: Eliminates duplicate packet transmission
 
-## Testing Plan
+## Testing
 
-1. Configure one ATAK device with the new port settings
-2. Modify ATAKHandler to implement the port-based forwarding logic
-3. Monitor logs to verify that only locally generated packets are being forwarded
-4. Deploy to all nodes once verified
+1. Verify ATAK devices are configured with correct input/output ports
+2. Confirm packets flow from output ports to input ports
+3. Monitor for any looping behavior
+4. Check packet reception on all configured nodes
