@@ -89,6 +89,7 @@ cp -v /home/natak/reticulum_mesh/tak_transmission/systemd_services.md "$CLEAN_RE
 # ATAK Module
 cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/atak_handler.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/atak_port_change.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/utils/compression.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/utils/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/utils/cot_zstd_compressor.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/utils/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/utils/cot_zstd_decompressor.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/utils/"

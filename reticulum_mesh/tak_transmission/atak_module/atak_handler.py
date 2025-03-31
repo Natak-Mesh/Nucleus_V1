@@ -100,8 +100,12 @@ class MulticastSocketManager:
             self.cleanup_socket(addr, port)
 
 # ATAK multicast addresses and ports
-MULTICAST_ADDRS = ["224.10.10.1", "239.2.3.1", "239.5.5.55"]
-MULTICAST_PORTS = [17012, 6969, 7171]
+# Both output (send) and input (receive) ports
+MULTICAST_ADDRS = ["224.10.10.1", "224.10.10.1", "239.2.3.1", "239.2.3.1", "239.5.5.55", "239.5.5.55"]
+MULTICAST_PORTS = [17012, 17013, 6969, 6970, 7171, 7172]
+
+# Define which ports are for output (locally generated packets)
+OUTPUT_PORTS = [17012, 6969, 7171]
 
 class ATAKHandler:
     def __init__(self, shared_dir: str = "/home/natak/reticulum_mesh/tak_transmission/shared"):
@@ -217,11 +221,11 @@ class ATAKHandler:
         except Exception as e:
             print(f"ERROR: Cleaning shared directories: {e}")
     
-    def process_packet(self, data: bytes) -> None:
+    def process_packet(self, data: bytes, packet_id: str = None, source_addr: str = None, source_port: int = None) -> None:
         """Process an ATAK packet for transmission"""
         try:
             # Compress data using zstd
-            print(f"OUTGOING PACKET: Received {len(data)} bytes")
+            print(f"OUTGOING PACKET: {packet_id} - Received {len(data)} bytes from {source_addr}:{source_port}")
             compressed = compress_cot_packet(data)
             outgoing_hash = hashlib.md5(compressed).hexdigest()
             print(f"HASH CHECK: Outgoing compressed data hash: {outgoing_hash}")
@@ -233,6 +237,13 @@ class ATAKHandler:
             # Check for duplicates before writing
             if self.is_duplicate(compressed):
                 return
+            
+            # Only forward packets from output ports (locally generated)
+            if source_port not in OUTPUT_PORTS:
+                print(f"SKIPPING: Remote packet from input port {source_port}")
+                return
+            else:
+                print(f"FORWARDING: Local packet from output port {source_port}")
             
             # Check if any nodes are in non-WIFI mode
             non_wifi_nodes = self.get_non_wifi_nodes()
@@ -254,14 +265,20 @@ class ATAKHandler:
             print(f"ERROR: Processing packet failed: {e}")
 
     def forward_to_atak(self, data: bytes) -> None:
-        """Forward packet to ATAK multicast addresses"""
+        """Forward packet to ATAK multicast addresses (input ports only)"""
         success_count = 0
-        for addr, port in zip(MULTICAST_ADDRS, MULTICAST_PORTS):
-            if self.socket_manager.send_packet(data, addr, port):
-                success_count += 1
-                print(f"FORWARD: {len(data)} bytes to {addr}:{port}")
         
-        print(f"Successfully forwarded to {success_count}/{len(MULTICAST_ADDRS)} multicast addresses")
+        # Define input ports (non-output ports)
+        INPUT_PORTS = [17013, 6970, 7172]
+        
+        # Only forward to input ports
+        for i, (addr, port) in enumerate(zip(MULTICAST_ADDRS, MULTICAST_PORTS)):
+            if port in INPUT_PORTS:
+                if self.socket_manager.send_packet(data, addr, port):
+                    success_count += 1
+                    print(f"FORWARD: {len(data)} bytes to {addr}:{port} (input port)")
+        
+        print(f"Successfully forwarded to {success_count}/{len(INPUT_PORTS)} input multicast addresses")
 
     def process_incoming(self) -> None:
         """Process packets in the incoming directory"""
@@ -312,8 +329,9 @@ class ATAKHandler:
                     sock.settimeout(0.1)
                     try:
                         data, src = sock.recvfrom(65535)
-                        print(f"RECEIVE: {len(data)} bytes from {src[0]}:{src[1]} on {addr}:{port}")
-                        self.process_packet(data)
+                        packet_id = f"pkt_{int(time.time() * 1000)}"
+                        print(f"RECEIVE: {packet_id} - {len(data)} bytes from {src[0]}:{src[1]} on {addr}:{port}")
+                        self.process_packet(data, packet_id=packet_id, source_addr=addr, source_port=port)
                     except socket.timeout:
                         continue
                     except Exception as e:
