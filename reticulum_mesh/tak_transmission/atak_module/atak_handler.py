@@ -235,7 +235,7 @@ class ATAKHandler:
         self.remote_ips.add(ip)
         return "REMOTE"
 
-    def process_packet(self, data: bytes) -> None:
+    def process_packet(self, data: bytes, src_port: int = None) -> None:
         """Process an ATAK packet for transmission"""
         try:
             compressed = compress_cot_packet(data)
@@ -255,6 +255,8 @@ class ATAKHandler:
                 
                 with open(path, 'wb') as f:
                     f.write(compressed)
+                if src_port:
+                    print(f"ATAK to LoRa: From port {src_port} -> {path}")
             else:
                 # Clean up directories if all nodes in WIFI mode
                 self.cleanup_shared_directories()
@@ -264,13 +266,12 @@ class ATAKHandler:
 
     def forward_to_atak(self, data: bytes) -> None:
         """Forward packet to ATAK multicast addresses"""
-        success_count = 0
+        ports = []
         for addr, port in zip(MULTICAST_ADDRS, MULTICAST_PORTS):
             if self.socket_manager.send_packet(data, addr, port):
-                success_count += 1
-                print(f"FORWARD LoRa PACKET: Writing to {addr}:{port} ({len(data)} bytes)")
-        
-        print(f"Successfully forwarded LoRa packet to {success_count}/{len(MULTICAST_ADDRS)} multicast addresses")
+                ports.append(str(port))
+        if ports:
+            print(f"LoRa to ATAK: Writing to ports {','.join(ports)}")
 
     def process_incoming(self) -> None:
         """Process packets in the incoming directory"""
@@ -313,7 +314,7 @@ class ATAKHandler:
                         data, src = sock.recvfrom(65535)
                         ip_type = self.check_ip_location(src[0])
                         print(f"UDP RECEIVE: Source IP {src[0]}:{src[1]} [{ip_type}] -> Listening on {addr}:{port} ({len(data)} bytes)")
-                        self.process_packet(data)
+                        self.process_packet(data, port)
                     except socket.timeout:
                         continue
                     except Exception:
