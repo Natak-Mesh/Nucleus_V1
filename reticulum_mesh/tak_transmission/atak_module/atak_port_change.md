@@ -72,3 +72,29 @@ In "Manage Inputs" section:
 2. Confirm packets flow from output ports to input ports
 3. Monitor for any looping behavior
 4. Check packet reception on all configured nodes
+
+## WiFi Packet Filtering
+
+When nodes are operating over WiFi, we can prevent packet loops by filtering out non-local packets using the br0 neighbor table. This works because WiFi packets maintain their original source IP addresses.
+
+### Implementation
+
+In atak_handler.run(), before processing any packet:
+```python
+data, src = sock.recvfrom(65535)
+# Get list of directly connected devices
+local_ips = []
+output = subprocess.check_output("ip neigh show dev br0", shell=True).decode().strip()
+for line in output.split('\n'):
+    if 'lladdr' in line:  # Only include entries with MAC addresses
+        ip = line.split()[0]
+        local_ips.append(ip)
+
+# Only process packets from local devices
+if src[0] in local_ips:
+    self.process_packet(data)
+```
+
+This ensures that only packets from directly connected devices (visible in br0's neighbor table) are processed and forwarded through the LoRa network.
+
+Note: This filtering only works for WiFi packets. LoRa-forwarded packets will need a different solution as they appear to come from the local node's IP address.
