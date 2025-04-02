@@ -330,7 +330,8 @@ class ATAKHandler:
                         data, src = sock.recvfrom(65535)
                         ip_type = self.check_ip_location(src[0])
                         print(f"UDP RECEIVE: Source IP {src[0]}:{src[1]} [{ip_type}] -> Listening on {addr}:{port} ({len(data)} bytes)")
-                        self.process_packet(data, port)
+                        if port in [17012, 6969] and ip_type == "LOCAL":
+                            self.process_packet(data, port)
                     except socket.timeout:
                         continue
                     except Exception:
