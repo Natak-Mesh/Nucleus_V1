@@ -98,8 +98,8 @@ ATAK_OUT_ADDRS = ["224.10.10.1", "239.2.3.1", "239.5.5.55"]
 ATAK_OUT_PORTS = [17012, 6969, 7171]
 
 # LoRa output addresses and ports
-LORA_OUT_ADDRS = ["224.10.10.1", "239.2.3.1", "239.5.5.55"]
-LORA_OUT_PORTS = [17012, 6969, 7171]
+LORA_OUT_ADDRS = ["224.10.10.1", "239.2.3.1"]
+LORA_OUT_PORTS = [17013, 6971]
 
 class ATAKHandler:
     def __init__(self, shared_dir: str = "/home/natak/reticulum_mesh/tak_transmission/shared"):
