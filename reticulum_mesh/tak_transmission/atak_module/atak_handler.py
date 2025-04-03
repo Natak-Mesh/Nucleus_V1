@@ -143,16 +143,32 @@ class ATAKHandler:
         except Exception:
             return None
     
+    def cleanup_atak_socket(self, addr: str, port: int) -> None:
+        """Clean up a specific ATAK listening socket"""
+        try:
+            sock = self.atak_listening_sockets.pop((addr, port), None)
+            if sock:
+                sock.close()
+        except Exception:
+            pass
+
     def setup_atak_listening_sockets(self) -> None:
         """Set up UDP sockets for listening to ATAK output"""
         # Get the IP address of the br0 interface
         br0_ip = self.get_br0_ip()
+            
+        # Clean up existing sockets first
+        for (addr, port) in list(self.atak_listening_sockets.keys()):
+            self.cleanup_atak_socket(addr, port)
             
         for addr, port in zip(ATAK_OUT_ADDRS, ATAK_OUT_PORTS):
             try:
                 # Create socket
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
+                sock.setblocking(False)
                 sock.bind(('', port))
                 
                 # Add socket to multicast group
@@ -335,7 +351,10 @@ class ATAKHandler:
                     except socket.timeout:
                         continue
                     except Exception:
-                        pass
+                        # Socket error - recreate socket
+                        self.cleanup_atak_socket(addr, port)
+                        self.setup_atak_listening_sockets()
+                        break
                 
                 # Check for incoming packets
                 self.process_incoming()
