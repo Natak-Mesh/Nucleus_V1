@@ -20,6 +20,7 @@ NODE_MODES_PATH = '/home/natak/reticulum_mesh/mesh_controller/node_modes.json'
 IDENTITY_MAP_PATH = '/home/natak/reticulum_mesh/identity_handler/identity_map.json'
 STATUS_PATH = '/home/natak/reticulum_mesh/ogm_monitor/status.json'
 RNS_STATUS_PATH = '/home/natak/reticulum_mesh/rns_stats/rns_status.json'
+PACKET_LOG_PATH = '/home/natak/reticulum_mesh/logs/packet_logs.log'
 
 # Cache for file data to avoid reading files on every request
 file_cache = {
@@ -176,6 +177,51 @@ def process_reticulum_peers():
 @app.route('/')
 def home():
     return render_template('index.html', hostname=socket.gethostname())
+
+@app.route('/packet-logs')
+def packet_logs():
+    return render_template('packet_logs.html', hostname=socket.gethostname())
+
+def read_packet_logs():
+    """Read the most recent packet log entries"""
+    try:
+        if not os.path.exists(PACKET_LOG_PATH):
+            return []
+        with open(PACKET_LOG_PATH, 'r') as f:
+            # Read last 100 lines (adjust as needed)
+            lines = f.readlines()[-100:]
+            return [line.strip() for line in lines if line.strip()]
+    except Exception as e:
+        app.logger.error(f"Error reading packet logs: {e}")
+        return []
+
+def generate_packet_log_events():
+    """Generate SSE events with packet log data"""
+    last_size = 0
+    while True:
+        try:
+            current_size = os.path.getsize(PACKET_LOG_PATH) if os.path.exists(PACKET_LOG_PATH) else 0
+            if current_size != last_size:
+                logs = read_packet_logs()
+                last_size = current_size
+                yield f"data: {json.dumps({'success': True, 'logs': logs})}\n\n"
+            time.sleep(1)
+        except Exception as e:
+            app.logger.error(f"Error generating packet log events: {e}")
+            yield f"data: {json.dumps({'success': False, 'error': str(e)})}\n\n"
+            time.sleep(1)
+
+@app.route('/packet-log-events')
+def packet_log_events():
+    """SSE endpoint for real-time packet log updates"""
+    return Response(
+        generate_packet_log_events(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
+    )
 
 
 @app.route('/get_mesh_data')

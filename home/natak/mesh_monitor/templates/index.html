@@ -223,7 +223,10 @@
             <span class="connection-indicator online" id="connectionStatus"></span>
             <span id="lastUpdate">Updated: Just now</span>
         </div>
-        <div>{{ hostname }}</div>
+        <div>
+            <a href="/packet-logs" style="color: var(--primary-color); text-decoration: none; margin-right: 8px;">Packet Logs</a>
+            | {{ hostname }}
+        </div>
     </div>
 
     <div class="header">
