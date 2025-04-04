@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import re
 import time
 import socket
 import logging
@@ -17,6 +18,10 @@ ASPECT = "cot"
 ANNOUNCE_INTERVAL = 60  # 1 minute
 PEER_TIMEOUT = 300      # 5 minutes
 STARTUP_DELAY = 10      # 10 seconds for LoRa radio
+
+# Retry Configuration
+PACKET_TIMEOUT = 5      # seconds to wait for delivery proof
+MAX_RETRIES = 3         # maximum number of retry attempts
 
 class ReticulumHandler:
     def __init__(self):
@@ -33,16 +38,19 @@ class ReticulumHandler:
         self.incoming_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/incoming"
         self.pending_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/pending"
         self.processing_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/processing"
+        self.sent_buffer_dir = "/home/natak/reticulum_mesh/tak_transmission/shared/sent_buffer"
         
         # Ensure directories exist
         os.makedirs(self.incoming_dir, exist_ok=True)
         os.makedirs(self.pending_dir, exist_ok=True)
         os.makedirs(self.processing_dir, exist_ok=True)
+        os.makedirs(self.sent_buffer_dir, exist_ok=True)
         
         # Runtime state
         self.hostname = socket.gethostname()
         self.peer_map = {}  # hostname -> destination
         self.last_seen = {} # hostname -> timestamp
+        self.packet_map = {} # packet_hash -> filename
         self.should_quit = False
         self.message_loops_running = False
         self.message_threads = []
@@ -64,8 +72,9 @@ class ReticulumHandler:
             ASPECT
         )
         
-        # Set up packet callback
+        # Set up packet callback and enable proofs
         self.destination.set_packet_callback(self.message_received)
+        self.destination.set_proof_strategy(RNS.Destination.PROVE_ALL)
         
         # Set up announce handler
         self.announce_handler = AnnounceHandler(
@@ -172,11 +181,6 @@ class ReticulumHandler:
                 # Get list of .zst files in pending directory
                 pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
                 
-                if pending_files:
-                    self.logger.info(f"PENDING FILES: Found {len(pending_files)} files in pending directory")
-                    for pf in pending_files:
-                        self.logger.info(f"PENDING FILE: {pf}")
-                
                 if not pending_files:
                     time.sleep(1)
                     continue
@@ -184,7 +188,6 @@ class ReticulumHandler:
                 # Sort by timestamp (assuming filename contains timestamp)
                 pending_files.sort()
                 oldest_file = pending_files[0]
-                self.logger.info(f"PROCESSING: Selected {oldest_file} for processing")
                 
                 # Move file to processing directory
                 pending_path = os.path.join(self.pending_dir, oldest_file)
@@ -210,11 +213,7 @@ class ReticulumHandler:
                     for hostname in target_hostnames:
                         if hostname in self.peer_map:
                             dest = self.peer_map[hostname]
-                            file_size = len(file_data)
-                            send_time = time.time()
-                            timestamp_from_filename = oldest_file.split('_')[1].split('.')[0] if '_' in oldest_file else 'unknown'
-                            
-                            self.logger.info(f"SEND DETAILS: File={oldest_file}, Size={file_size} bytes, To={hostname}, TimestampFromFilename={timestamp_from_filename}")
+                            self.logger.info(f"Sending {oldest_file} to {hostname}")
                             
                             # Create outgoing destination
                             outgoing_dest = RNS.Destination(
@@ -225,37 +224,95 @@ class ReticulumHandler:
                                 ASPECT
                             )
                             
-                            # Send packet
-                            packet = RNS.Packet(outgoing_dest, file_data)
-                            packet.send()
+                            # Enable proofs on this outgoing destination
+                            outgoing_dest.set_proof_strategy(RNS.Destination.PROVE_ALL)
                             
-                            self.logger.info(f"SENT: {oldest_file} to {hostname} at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-                
-                # Remove file from processing directory
-                os.remove(processing_path)
+                            # Send packet with proof tracking
+                            packet = RNS.Packet(outgoing_dest, file_data)
+                            receipt = packet.send()
+                            if receipt:
+                                self.logger.info(f"TRACKING: Setting up receipt tracking for {oldest_file} (packet {RNS.prettyhexrep(receipt.hash)})")
+                                self.logger.info(f"SENT: {oldest_file} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
+                                
+                                # Move to sent_buffer and track packet
+                                sent_path = os.path.join(self.sent_buffer_dir, oldest_file)
+                                os.rename(processing_path, sent_path)
+                                self.packet_map[receipt.hash] = oldest_file
+                                
+                                # Set callbacks with configured timeout
+                                receipt.set_timeout(PACKET_TIMEOUT)
+                                receipt.set_delivery_callback(self.delivery_confirmed)
+                                receipt.set_timeout_callback(self.delivery_failed)
                 
             except Exception as e:
                 self.logger.error(f"Error processing outgoing message: {e}")
                 time.sleep(1)
 
+    def delivery_confirmed(self, receipt):
+        """Handle successful delivery confirmation"""
+        self.logger.info(f"DELIVERY_CONFIRMED: Got proof for packet {RNS.prettyhexrep(receipt.hash)} in {receipt.get_rtt():.3f}s")
+        
+        # Get filename and remove from sent_buffer
+        filename = self.packet_map.pop(receipt.hash, None)
+        if filename:
+            sent_path = os.path.join(self.sent_buffer_dir, filename)
+            if os.path.exists(sent_path):
+                os.remove(sent_path)
+                self.logger.info(f"DELIVERY_CONFIRMED: Successfully delivered {filename}, removed from sent_buffer")
+
+    def delivery_failed(self, receipt):
+        """Handle delivery timeout"""
+        self.logger.info(f"DELIVERY_FAILED: No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
+        
+        # Get filename and move back to pending for retry
+        filename = self.packet_map.pop(receipt.hash, None)
+        if filename:
+            sent_path = os.path.join(self.sent_buffer_dir, filename)
+            
+            # Check if this is already a retry
+            retry_count = 1
+            retry_match = re.search(r'_retry(\d+)\.zst$', filename)
+            if retry_match:
+                retry_count = int(retry_match.group(1)) + 1
+                # Remove the old retry suffix
+                base_filename = re.sub(r'_retry\d+\.zst$', '.zst', filename)
+            else:
+                # First retry
+                base_filename = filename
+                
+            # Check max retries
+            if retry_count > MAX_RETRIES:
+                self.logger.error(f"RETRY_FAILED: Max retries ({MAX_RETRIES}) reached for {filename}, dropping packet")
+                if os.path.exists(sent_path):
+                    os.remove(sent_path)
+                return
+                
+            # Add retry counter to filename
+            new_filename = base_filename.replace('.zst', f'_retry{retry_count}.zst')
+            pending_path = os.path.join(self.pending_dir, new_filename)
+            
+            if os.path.exists(sent_path):
+                # Move back to pending with updated filename
+                os.rename(sent_path, pending_path)
+                self.logger.info(f"RETRY_ATTEMPT: Moving {filename} to {new_filename} for retry {retry_count}/{MAX_RETRIES}")
+
     def message_received(self, data, packet):
         """Handle incoming messages"""
         try:
+            # Get source information if available
+            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
+            data_size = len(data)
+            
             # Generate unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             filename = f"incoming_{timestamp}.zst"
             file_path = os.path.join(self.incoming_dir, filename)
             
-            # Get source information if available
-            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
-            data_size = len(data)
-            
-            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={source_hash}, Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-            
             # Write data to file
             with open(file_path, 'wb') as f:
                 f.write(data)
-                
+            
+            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={source_hash}, Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
             self.logger.info(f"SAVED: Message saved to {filename}")
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")

@@ -31,7 +31,7 @@
     txpower = 20
     spreadingfactor = 8
     # dont mess with below settings, looks like they trash the lora connection
-    persistence = 100
+    persistence = 255
     slottime = 10
     codingrate = 5
     mode = full
