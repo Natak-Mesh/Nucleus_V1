@@ -29,7 +29,7 @@
     frequency = 915000000
     bandwidth = 125000
     txpower = 20
-    spreadingfactor = 10
+    spreadingfactor = 8
     # CDMA settings next two lines
     # persistence = 255
     # slottime = i

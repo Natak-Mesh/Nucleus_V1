@@ -4,6 +4,7 @@ import json
 import os
 import time
 import logging
+import subprocess
 from functools import partial
 
 app = Flask(__name__)
@@ -79,6 +80,37 @@ def get_reticulum_status():
     """Get Reticulum status from rns_status.json"""
     rns_data = read_json_file(RNS_STATUS_PATH, 'rns_status')
     return rns_data.get('peers', {})
+
+@app.route('/wifi/toggle', methods=['POST'])
+def toggle_wifi():
+    try:
+        # Check current state
+        result = subprocess.run(['ip', 'link', 'show', 'wlan1'], capture_output=True, text=True)
+        is_up = 'state UP' in result.stdout
+        
+        if is_up:
+            # Turn WiFi off
+            cmd = ['ip', 'link', 'set', 'wlan1', 'down']
+            subprocess.run(cmd, check=True)
+            new_state = 'down'
+        else:
+            # Turn WiFi on
+            cmd = ['ip', 'link', 'set', 'wlan1', 'up']
+            subprocess.run(cmd, check=True)
+            new_state = 'up'
+        
+        # Verify the change
+        verify = subprocess.run(['ip', 'link', 'show', 'wlan1'], capture_output=True, text=True)
+        actual_state = 'up' if 'state UP' in verify.stdout else 'down'
+        
+        return jsonify({
+            'success': True,
+            'state': actual_state,
+            'changed': actual_state == new_state
+        })
+    except Exception as e:
+        app.logger.error(f"Error toggling WiFi: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 def get_local_info():
     """Get local node information from identity_map.json and rns_status.json"""
@@ -183,14 +215,23 @@ def packet_logs():
     return render_template('packet_logs.html', hostname=socket.gethostname())
 
 def read_packet_logs():
-    """Read the most recent packet log entries"""
+    """Read the most recent packet log entries and keep only last 20 lines"""
     try:
         if not os.path.exists(PACKET_LOG_PATH):
             return []
+            
+        # Read all lines
         with open(PACKET_LOG_PATH, 'r') as f:
-            # Read last 100 lines (adjust as needed)
-            lines = f.readlines()[-100:]
-            return [line.strip() for line in lines if line.strip()]
+            all_lines = f.readlines()
+            
+        # Keep last 20 lines
+        recent_lines = all_lines[-20:] if len(all_lines) > 20 else all_lines
+            
+        # Write back only recent logs
+        with open(PACKET_LOG_PATH, 'w') as f:
+            f.writelines(recent_lines)
+            
+        return [line.strip() for line in recent_lines]
     except Exception as e:
         app.logger.error(f"Error reading packet logs: {e}")
         return []

@@ -243,8 +243,47 @@
                 <div class="label">Connected Nodes</div>
                 <div class="value" id="nodeCount">-</div>
             </div>
+            <div class="stat-item">
+                <button id="wifiToggle" class="wifi-toggle" onclick="toggleWifi()">Deactivate WiFi</button>
+            </div>
         </div>
     </div>
+
+    <style>
+        .wifi-toggle {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 500;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        .wifi-toggle.off {
+            background-color: var(--danger-color);
+        }
+    </style>
+
+    <script>
+        async function toggleWifi() {
+            try {
+                const response = await fetch('/wifi/toggle', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    const btn = document.getElementById('wifiToggle');
+                    btn.textContent = data.state === 'up' ? 'Deactivate WiFi' : 'Activate WiFi';
+                    btn.classList.toggle('off', data.state === 'down');
+                }
+            } catch (error) {
+                console.error('Error toggling WiFi:', error);
+            }
+        }
+    </script>
 
     <div class="content">
         <div id="nodeContent"></div>
