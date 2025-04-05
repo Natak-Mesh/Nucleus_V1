@@ -215,23 +215,21 @@ def packet_logs():
     return render_template('packet_logs.html', hostname=socket.gethostname())
 
 def read_packet_logs():
-    """Read the most recent packet log entries and keep only last 20 lines"""
+    """Read the most recent packet log entries (last 100 lines)"""
     try:
         if not os.path.exists(PACKET_LOG_PATH):
             return []
             
-        # Read all lines
+        # Use deque to efficiently get last N lines without loading entire file
+        from collections import deque
+        
+        # Read last 100 lines
+        lines = deque(maxlen=100)
         with open(PACKET_LOG_PATH, 'r') as f:
-            all_lines = f.readlines()
-            
-        # Keep last 20 lines
-        recent_lines = all_lines[-20:] if len(all_lines) > 20 else all_lines
-            
-        # Write back only recent logs
-        with open(PACKET_LOG_PATH, 'w') as f:
-            f.writelines(recent_lines)
-            
-        return [line.strip() for line in recent_lines]
+            for line in f:
+                lines.append(line)
+                
+        return [line.strip() for line in lines]
     except Exception as e:
         app.logger.error(f"Error reading packet logs: {e}")
         return []

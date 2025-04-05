@@ -78,6 +78,13 @@
             height: 100%;
             overflow-y: auto;  /* Enable vertical scrolling */
             padding-right: 16px;  /* Space for scrollbar */
+            display: flex;
+            flex-direction: column;
+            gap: 2px;  /* Small gap between log entries */
+        }
+
+        #logContent > div:first-child {
+            margin-top: auto;  /* Push content to bottom when not filled */
         }
 
         .controls {
@@ -214,61 +221,109 @@
             logContent.innerHTML = '';
             
             logs.forEach(log => {
-                // Skip non-essential log lines
-                if (log.includes('AnnounceHandler') || 
-                    log.includes('Sending packet') || 
-                    log.includes('TRACKING:') ||
-                    log.includes('Got proof') ||
-                    log === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer') {
-                    return;
-                }
+            // Skip non-essential log lines
+            if (log.includes('AnnounceHandler') || 
+                log.includes('Sending packet') || 
+                log.includes('TRACKING:') ||
+                log.includes('Got proof') ||
+                log === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer' ||
+                log.includes('Reticulum Handler running')) {
+                return;
+            }
 
                 const entry = document.createElement('div');
                 entry.className = 'log-entry';
                 
                 let formattedLog = log;
                 
+                // Remove timestamp prefix if present
+                let cleanLog = log;
+                if (log.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - /)) {
+                    cleanLog = log.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - /, '');
+                } else if (log.match(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - /)) {
+                    cleanLog = log.replace(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - /, '');
+                }
+                
                 // Extract packet info
-                if (log.includes('SENT:')) {
-                    const match = log.match(/packet_(\d+)\.zst to (\w+)/);
+                if (cleanLog.includes('SENT:')) {
+                    // Handle regular SENT messages
+                    let match = cleanLog.match(/packet_(\d+)\.zst to (\w+)/);
+                    
+                    // Handle retry SENT messages
+                    if (!match) {
+                        match = cleanLog.match(/packet_(\d+)_retry\d+_to_\w+\.zst to (\w+)/);
+                    }
+                    
                     if (match) {
-                        formattedLog = `SENT: packet_${match[1]} → ${match[2]}`;
+                        formattedLog = `SENT: #${match[1]} → ${match[2]}`;
                         entry.classList.add('sent');
                     }
                 }
-                else if (log.includes('DELIVERY_CONFIRMED:') && log.includes('Successfully delivered')) {
-                    const match = log.match(/Successfully delivered packet_(\d+)_to_(\w+)\.zst/);
-                    if (match) {
-                        const [_, packetId, node] = match;
-                        formattedLog = `DELIVERY_CONFIRMED: packet_${packetId} → ${node}`;
-                        entry.classList.add('confirmed');
+                else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
+                    if (cleanLog.includes('Successfully delivered')) {
+                        // Handle regular delivery confirmations
+                        let match = cleanLog.match(/Successfully delivered packet_(\d+)_to_(\w+)\.zst/);
+                        
+                        // Handle retry delivery confirmations
+                        if (!match) {
+                            match = cleanLog.match(/Successfully delivered packet_(\d+)_retry\d+_to_(\w+)(?:_to_\w+)?\.zst/);
+                        }
+                        
+                        if (match) {
+                            const [_, packetId, node] = match;
+                            // Try to extract delivery time if available
+                            const timeMatch = cleanLog.match(/in (\d+\.\d+)s/);
+                            const timeInfo = timeMatch ? ` (${timeMatch[1]}s)` : '';
+                            formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node}${timeInfo}`;
+                            entry.classList.add('confirmed');
+                        }
                     }
                 }
-                else if (log.includes('INCOMING:')) {
-                    const incomingMatch = log.match(/Size=(\d+) bytes, Source=(\w+)/);
-                    const packetMatch = log.match(/incoming_(\d+)\.zst/);
-                    if (incomingMatch && packetMatch) {
-                        const [_, size, source] = incomingMatch;
-                        const packetId = packetMatch[1];
-                        formattedLog = `INCOMING: packet_${packetId} from ${source} (${size} bytes)`;
+                else if (cleanLog.includes('INCOMING:')) {
+                    // Extract just the size and source, ignoring timestamp and Time field
+                    const sizeMatch = cleanLog.match(/Size=(\d+) bytes/);
+                    const sourceMatch = cleanLog.match(/Source=(\w+)/);
+                    
+                    // Try to extract packet ID from filename or generate one from timestamp
+                    let packetId = "unknown";
+                    const packetMatch = cleanLog.match(/incoming_(\d+)\.zst/);
+                    if (packetMatch) {
+                        packetId = packetMatch[1];
+                    } else {
+                        // Extract timestamp as fallback ID
+                        const timeMatch = cleanLog.match(/Time=(\d{2}:\d{2}:\d{2}\.\d{3})/);
+                        if (timeMatch) {
+                            packetId = timeMatch[1].replace(/[:.]/g, '');
+                        }
+                    }
+                    
+                    if (sizeMatch) {
+                        const size = sizeMatch[1];
+                        const source = sourceMatch ? sourceMatch[1] : "unknown";
+                        formattedLog = `INCOMING: #${packetId} from ${source} (${size} bytes)`;
                         entry.classList.add('incoming');
                     }
                 }
-                else if (log.includes('DELIVERY_FAILED:')) {
-                    const match = log.match(/packet <[a-f0-9]+> after (\d+) attempts/);
-                    const packetMatch = log.match(/packet_(\d+)_to_(\w+)\.zst/);
-                    if (match && packetMatch) {
-                        const [_, attempts] = match;
-                        const [__, packetId, node] = packetMatch;
-                        formattedLog = `DELIVERY_FAILED: packet_${packetId} → ${node} (${attempts} attempts)`;
-                        entry.classList.add('failed');
+                else if (cleanLog.includes('DELIVERY_FAILED:')) {
+                    // Extract packet ID from various formats
+                    let packetId = "unknown";
+                    let node = "unknown";
+                    
+                    // Try to find packet ID in filename
+                    const packetMatch = cleanLog.match(/packet_(\d+)_to_(\w+)\.zst/);
+                    if (packetMatch) {
+                        packetId = packetMatch[1];
+                        node = packetMatch[2];
                     }
+                    
+                    formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
+                    entry.classList.add('failed');
                 }
-                else if (log.includes('RETRY_ATTEMPT:')) {
-                    const match = log.match(/Moving .* to packet_(\d+)_retry(\d+)_to_(\w+)\.zst/);
+                else if (cleanLog.includes('RETRY_ATTEMPT:')) {
+                    const match = cleanLog.match(/Moving .* to packet_(\d+)_retry(\d+)_to_(\w+)\.zst/);
                     if (match) {
                         const [_, packetId, retryCount, node] = match;
-                        formattedLog = `RETRY: packet_${packetId} → ${node} (attempt ${retryCount}/${MAX_RETRIES})`;
+                        formattedLog = `RETRY: #${packetId} → ${node} (try ${retryCount}/${MAX_RETRIES})`;
                         entry.classList.add('retry');
                     }
                 }
