@@ -361,6 +361,7 @@ class ReticulumHandler:
         try:
             # Get source information if available
             source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
+            hostname = next((name for name, identity in self.peer_map.items() if RNS.prettyhexrep(identity.hash) == source_hash), "unknown")
             data_size = len(data)
             
             # Generate unique filename with timestamp
@@ -372,7 +373,7 @@ class ReticulumHandler:
             with open(file_path, 'wb') as f:
                 f.write(data)
             
-            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={source_hash}, Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={hostname} ({source_hash}), Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
             self.logger.info(f"SAVED: Message saved to {filename}")
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")
