@@ -13,6 +13,7 @@
             --success-color: #4caf50;
             --danger-color: #ff4500;
             --warning-color: #ffa500;
+            --incoming-color: #9c27b0; /* Purple color for incoming messages */
             --shadow-color: rgba(0,0,0,0.1);
         }
 
@@ -141,7 +142,7 @@
         }
 
         .log-entry.incoming {
-            color: var(--primary-color);
+            color: var(--incoming-color);
         }
 
         a {
@@ -225,9 +226,9 @@
             if (log.includes('AnnounceHandler') || 
                 log.includes('Sending packet') || 
                 log.includes('TRACKING:') ||
-                log.includes('Got proof') ||
                 log === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer' ||
-                log.includes('Reticulum Handler running')) {
+                log.includes('Reticulum Handler running') ||
+                log.includes('DELIVERY_CONFIRMED: Got proof from')) {
                 return;
             }
 
@@ -259,26 +260,105 @@
                         entry.classList.add('sent');
                     }
                 }
-                else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
-                    if (cleanLog.includes('Successfully delivered')) {
-                        // Handle regular delivery confirmations
-                        let match = cleanLog.match(/Successfully delivered packet_(\d+)_to_(\w+)\.zst/);
-                        
-                        // Handle retry delivery confirmations
-                        if (!match) {
-                            match = cleanLog.match(/Successfully delivered packet_(\d+)_retry\d+_to_(\w+)(?:_to_\w+)?\.zst/);
-                        }
-                        
-                        if (match) {
-                            const [_, packetId, node] = match;
-                            // Try to extract delivery time if available
-                            const timeMatch = cleanLog.match(/in (\d+\.\d+)s/);
-                            const timeInfo = timeMatch ? ` (${timeMatch[1]}s)` : '';
-                            formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node}${timeInfo}`;
-                            entry.classList.add('confirmed');
+else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
+    if (cleanLog.includes('Successfully delivered')) {
+        // Handle regular delivery confirmations
+        let match = cleanLog.match(/Successfully delivered packet_(\d+)_to_(\w+)\.zst/);
+        
+        // Handle retry delivery confirmations
+        if (!match) {
+            match = cleanLog.match(/Successfully delivered packet_(\d+)_retry\d+_to_(\w+)(?:_to_\w+)?\.zst/);
+        }
+        
+        if (match) {
+            const [_, packetId, fullNode] = match;
+            
+            // Extract just the base node name (before any _to_ suffix)
+            let node = fullNode;
+            if (fullNode.includes('_to_')) {
+                node = fullNode.split('_to_')[0];
+            }
+            
+            // Try to find RTT time from previous "Got proof from" log entry
+            let rttTime = null;
+            for (let i = logs.indexOf(log) - 1; i >= 0 && i >= logs.indexOf(log) - 5; i--) {
+                const prevLog = logs[i];
+                if (prevLog.includes('Got proof from') && 
+                    (prevLog.includes(node) || prevLog.includes(fullNode))) {
+                    const timeMatch = prevLog.match(/in (\d+\.\d+)s/);
+                    if (timeMatch) {
+                        rttTime = timeMatch[1];
+                        break;
+                    }
+                }
+            }
+            
+            const timeInfo = rttTime ? ` (${rttTime}s)` : '';
+            formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node}${timeInfo}`;
+            entry.classList.add('confirmed');
+        }
+    } else if (cleanLog.includes('Got proof from')) {
+        // Handle the first DELIVERY_CONFIRMED message format
+        const match = cleanLog.match(/Got proof from (\w+) for packet .*<([^>]+)>.* in (\d+\.\d+)s/);
+        if (match) {
+            const [_, node, packetHash, time] = match;
+            
+            // Try to find the packet ID from previous SENT messages
+            let packetId = "";
+            for (let i = logs.indexOf(log) - 1; i >= 0 && i >= logs.indexOf(log) - 10; i--) {
+                const prevLog = logs[i];
+                if (prevLog.includes(packetHash) && prevLog.includes('SENT:')) {
+                    const idMatch = prevLog.match(/packet_(\d+)/);
+                    if (idMatch) {
+                        packetId = idMatch[1];
+                        break;
+                    }
+                }
+            }
+            
+            if (packetId) {
+                formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node} (${time}s)`;
+            } else {
+                formattedLog = `DELIVERY_CONFIRMED: Proof from ${node} (${time}s)`;
+            }
+            entry.classList.add('confirmed');
+        }
+    } else {
+        // Handle the format seen in the logs: DELIVERY_CONFIRMED: #1743888045269 → takNode2_to_takNode2
+        const match = cleanLog.match(/DELIVERY_CONFIRMED: #(\d+) → (\w+)/);
+        if (match) {
+            const [_, packetId, fullNode] = match;
+            
+            // Extract just the base node name (before any _to_ suffix)
+            let node = fullNode;
+            if (fullNode.includes('_to_')) {
+                node = fullNode.split('_to_')[0];
+            }
+            
+            // Try to extract RTT time if available
+            let timeMatch = cleanLog.match(/in (\d+\.\d+)s/);
+            
+            // Try to find RTT time from previous "Got proof from" log entry if not in this log
+            if (!timeMatch) {
+                for (let i = logs.indexOf(log) - 1; i >= 0 && i >= logs.indexOf(log) - 5; i--) {
+                    const prevLog = logs[i];
+                    if (prevLog.includes('Got proof from') && 
+                        (prevLog.includes(node) || prevLog.includes(fullNode))) {
+                        const prevTimeMatch = prevLog.match(/in (\d+\.\d+)s/);
+                        if (prevTimeMatch) {
+                            timeMatch = prevTimeMatch;
+                            break;
                         }
                     }
                 }
+            }
+            
+            const timeInfo = timeMatch ? ` (${timeMatch[1]}s)` : '';
+            formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node}${timeInfo}`;
+            entry.classList.add('confirmed');
+        }
+    }
+}
                 else if (cleanLog.includes('INCOMING:')) {
                     // Extract just the size and source, ignoring timestamp and Time field
                     const sizeMatch = cleanLog.match(/Size=(\d+) bytes/);
@@ -305,18 +385,26 @@
                     }
                 }
                 else if (cleanLog.includes('DELIVERY_FAILED:')) {
-                    // Extract packet ID from various formats
-                    let packetId = "unknown";
-                    let node = "unknown";
-                    
-                    // Try to find packet ID in filename
-                    const packetMatch = cleanLog.match(/packet_(\d+)_to_(\w+)\.zst/);
-                    if (packetMatch) {
-                        packetId = packetMatch[1];
-                        node = packetMatch[2];
+                    // Extract packet ID and node from the new format
+                    const newFormatMatch = cleanLog.match(/No proof received for packet (\d+) to (\w+)/);
+                    if (newFormatMatch) {
+                        const packetId = newFormatMatch[1];
+                        const node = newFormatMatch[2];
+                        formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
+                    } else {
+                        // Fallback to old format or unknown
+                        let packetId = "unknown";
+                        let node = "unknown";
+                        
+                        // Try to find packet ID in filename
+                        const packetMatch = cleanLog.match(/packet_(\d+)_to_(\w+)\.zst/);
+                        if (packetMatch) {
+                            packetId = packetMatch[1];
+                            node = packetMatch[2];
+                        }
+                        
+                        formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
                     }
-                    
-                    formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
                     entry.classList.add('failed');
                 }
                 else if (cleanLog.includes('RETRY_ATTEMPT:')) {

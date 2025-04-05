@@ -37,8 +37,34 @@ class ReticulumHandler:
         os.makedirs(log_dir, exist_ok=True)
         packet_log_file = os.path.join(log_dir, "packet_logs.log")
         
-        # Simple file handler that logs everything
-        file_handler = logging.FileHandler(packet_log_file)
+        # Custom file handler that maintains last 100 lines
+        class RotatingHandler(logging.FileHandler):
+            def __init__(self, filename, mode='a', encoding=None, delay=False, max_lines=100):
+                super().__init__(filename, mode, encoding, delay)
+                self.max_lines = max_lines
+                
+            def emit(self, record):
+                try:
+                    # Read existing lines
+                    lines = []
+                    if os.path.exists(self.baseFilename):
+                        with open(self.baseFilename, 'r') as f:
+                            lines = f.readlines()
+                    
+                    # Add new line
+                    lines.append(self.format(record) + '\n')
+                    
+                    # Keep only last max_lines
+                    lines = lines[-self.max_lines:]
+                    
+                    # Write back to file
+                    with open(self.baseFilename, 'w') as f:
+                        f.writelines(lines)
+                except Exception:
+                    self.handleError(record)
+        
+        # Use custom handler that maintains last 100 lines
+        file_handler = RotatingHandler(packet_log_file, max_lines=100)
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
         self.logger.addHandler(file_handler)
@@ -284,14 +310,36 @@ class ReticulumHandler:
             sent_path = os.path.join(self.sent_buffer_dir, filename)
             if os.path.exists(sent_path):
                 os.remove(sent_path)
-                self.logger.info(f"DELIVERY_CONFIRMED: Successfully delivered {filename}, removed from sent_buffer")
+                self.logger.info(f"DELIVERY_CONFIRMED: Successfully delivered {filename} in {receipt.get_rtt():.3f}s, removed from sent_buffer")
 
     def delivery_failed(self, receipt):
         """Handle delivery timeout"""
-        self.logger.info(f"DELIVERY_FAILED: No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
-        
         # Get filename and move back to pending for retry
         filename = self.packet_map.pop(receipt.hash, None)
+        
+        # Enhanced log message with packet ID and node if available
+        if filename:
+            # Try to extract packet ID and node from filename
+            packet_id = "unknown"
+            node = "unknown"
+            
+            try:
+                # Simple regex to extract packet ID and node
+                packet_match = re.search(r'packet_(\d+)', filename)
+                if packet_match:
+                    packet_id = packet_match.group(1)
+                
+                node_match = re.search(r'_to_([^_\.]+)', filename)
+                if node_match:
+                    node = node_match.group(1)
+                    
+                self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {node} (hash: {RNS.prettyhexrep(receipt.hash)}) after {PACKET_TIMEOUT}s")
+            except:
+                # Fallback to original message if parsing fails
+                self.logger.info(f"DELIVERY_FAILED: No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
+        else:
+            # Original message if no filename is found
+            self.logger.info(f"DELIVERY_FAILED: No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
         if filename:
             sent_path = os.path.join(self.sent_buffer_dir, filename)
             
