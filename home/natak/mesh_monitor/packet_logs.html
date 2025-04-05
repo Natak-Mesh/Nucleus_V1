@@ -403,6 +403,13 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
                             node = packetMatch[2];
                         }
                         
+                        // Try to match the format we added in reticulum_handler.py
+                        const unknownMatch = cleanLog.match(/packet (\w+) to (\w+) \(hash:/);
+                        if (unknownMatch) {
+                            packetId = unknownMatch[1];
+                            node = unknownMatch[2];
+                        }
+                        
                         formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
                     }
                     entry.classList.add('failed');
