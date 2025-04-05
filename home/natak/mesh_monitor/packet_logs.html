@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Packet Delivery Logs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --success-color: #4caf50;
+            --danger-color: #ff4500;
+            --warning-color: #ffa500;
+            --shadow-color: rgba(0,0,0,0.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #1a1a1a;
+                --card-background: #2d2d2d;
+                --text-primary: #ffffff;
+                --text-secondary: #cccccc;
+                --shadow-color: rgba(0,0,0,0.3);
+            }
+        }
+
+        body {
+            font-family: monospace;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-background);
+            padding: 12px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .connection-indicator.online {
+            background-color: var(--success-color);
+        }
+
+        .connection-indicator.offline {
+            background-color: var(--danger-color);
+        }
+
+        .content {
+            margin-top: 56px;
+            padding: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+            position: relative;
+            height: calc(100vh - 88px);  /* Full height minus margins */
+            overflow: hidden;  /* Prevent content overflow */
+        }
+
+        #logContent {
+            height: 100%;
+            overflow-y: auto;  /* Enable vertical scrolling */
+            padding-right: 16px;  /* Space for scrollbar */
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .control-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .control-button:hover {
+            opacity: 1;
+        }
+
+        .control-button.paused {
+            background-color: var(--danger-color);
+        }
+
+        .log-entry {
+            margin: 4px 0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-entry.sent {
+            color: var(--primary-color);
+        }
+
+        .log-entry.confirmed {
+            color: var(--success-color);
+        }
+
+        .log-entry.failed {
+            color: var(--danger-color);
+        }
+
+        .log-entry.retry {
+            color: var(--warning-color);
+        }
+
+        .log-entry.incoming {
+            color: var(--primary-color);
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-bar">
+        <div>
+            <span class="connection-indicator online" id="connectionStatus"></span>
+            <span id="lastUpdate">Updated: Just now</span>
+        </div>
+        <div>
+            <a href="/">← Mesh Monitor</a> | {{ hostname }}
+        </div>
+    </div>
+
+    <div class="content">
+        <div id="logContent"></div>
+    </div>
+
+    <div class="controls">
+        <button id="scrollToBottom" class="control-button">Scroll to Bottom</button>
+        <button id="togglePause" class="control-button">Pause Updates</button>
+    </div>
+
+    <script>
+        let eventSource = null;
+        const MAX_RETRIES = 3;  // Match the value from reticulum_handler.py
+
+        function connectEventSource() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource('/packet-log-events');
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.success) {
+                    displayLogs(data.logs);
+                    document.getElementById('lastUpdate').textContent = 
+                        `Updated: ${new Date().toLocaleTimeString()}`;
+                    document.getElementById('connectionStatus').className = 
+                        'connection-indicator online';
+                }
+            };
+
+            eventSource.onerror = function() {
+                document.getElementById('connectionStatus').className = 
+                    'connection-indicator offline';
+                setTimeout(connectEventSource, 5000);
+            };
+        }
+
+        let isPaused = false;
+        let lastLogs = [];
+
+        let userHasScrolled = false;
+
+        function displayLogs(logs) {
+            // Store the logs for later use
+            lastLogs = logs;
+            
+            // If paused, don't update the display
+            if (isPaused) return;
+            
+            const logContent = document.getElementById('logContent');
+            
+            // Clear existing content and display new logs
+            logContent.innerHTML = '';
+            
+            logs.forEach(log => {
+                // Skip non-essential log lines
+                if (log.includes('AnnounceHandler') || 
+                    log.includes('Sending packet') || 
+                    log.includes('TRACKING:') ||
+                    log.includes('Got proof') ||
+                    log === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer') {
+                    return;
+                }
+
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                
+                let formattedLog = log;
+                
+                // Extract packet info
+                if (log.includes('SENT:')) {
+                    const match = log.match(/packet_(\d+)\.zst to (\w+)/);
+                    if (match) {
+                        formattedLog = `SENT: packet_${match[1]} → ${match[2]}`;
+                        entry.classList.add('sent');
+                    }
+                }
+                else if (log.includes('DELIVERY_CONFIRMED:') && log.includes('Successfully delivered')) {
+                    const match = log.match(/Successfully delivered packet_(\d+)_to_(\w+)\.zst/);
+                    if (match) {
+                        const [_, packetId, node] = match;
+                        formattedLog = `DELIVERY_CONFIRMED: packet_${packetId} → ${node}`;
+                        entry.classList.add('confirmed');
+                    }
+                }
+                else if (log.includes('INCOMING:')) {
+                    const incomingMatch = log.match(/Size=(\d+) bytes, Source=(\w+)/);
+                    const packetMatch = log.match(/incoming_(\d+)\.zst/);
+                    if (incomingMatch && packetMatch) {
+                        const [_, size, source] = incomingMatch;
+                        const packetId = packetMatch[1];
+                        formattedLog = `INCOMING: packet_${packetId} from ${source} (${size} bytes)`;
+                        entry.classList.add('incoming');
+                    }
+                }
+                else if (log.includes('DELIVERY_FAILED:')) {
+                    const match = log.match(/packet <[a-f0-9]+> after (\d+) attempts/);
+                    const packetMatch = log.match(/packet_(\d+)_to_(\w+)\.zst/);
+                    if (match && packetMatch) {
+                        const [_, attempts] = match;
+                        const [__, packetId, node] = packetMatch;
+                        formattedLog = `DELIVERY_FAILED: packet_${packetId} → ${node} (${attempts} attempts)`;
+                        entry.classList.add('failed');
+                    }
+                }
+                else if (log.includes('RETRY_ATTEMPT:')) {
+                    const match = log.match(/Moving .* to packet_(\d+)_retry(\d+)_to_(\w+)\.zst/);
+                    if (match) {
+                        const [_, packetId, retryCount, node] = match;
+                        formattedLog = `RETRY: packet_${packetId} → ${node} (attempt ${retryCount}/${MAX_RETRIES})`;
+                        entry.classList.add('retry');
+                    }
+                }
+                else {
+                    return; // Skip any other log lines
+                }
+                
+                entry.textContent = formattedLog;
+                logContent.appendChild(entry);
+            });
+            
+            // Auto-scroll unless user has manually scrolled up
+            if (!userHasScrolled) {
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+        }
+
+        // Track user scroll
+        document.getElementById('logContent').addEventListener('scroll', function() {
+            const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 1;
+            userHasScrolled = !isAtBottom;
+        });
+
+        // Scroll to bottom button
+        document.getElementById('scrollToBottom').addEventListener('click', function() {
+            const logContent = document.getElementById('logContent');
+            logContent.scrollTop = logContent.scrollHeight;
+            userHasScrolled = false;  // Resume auto-scrolling
+        });
+
+        // Toggle pause button
+        document.getElementById('togglePause').addEventListener('click', function() {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? 'Resume Updates' : 'Pause Updates';
+            this.classList.toggle('paused', isPaused);
+            
+            // If resuming, update with the latest logs
+            if (!isPaused) {
+                displayLogs(lastLogs);
+            }
+        });
+
+        // Handle page visibility
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                eventSource?.close();
+            } else {
+                connectEventSource();
+            }
+        });
+
+        // Initial connection
+        connectEventSource();
+    </script>
+</body>
+</html>

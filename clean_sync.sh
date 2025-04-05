@@ -55,6 +55,7 @@ cp -v /etc/systemd/network/wlan0.network "$CLEAN_REPO_DIR/etc/systemd/network/"
 cp -v /home/natak/mesh_monitor/app.py "$CLEAN_REPO_DIR/home/natak/mesh_monitor/"
 cp -v /home/natak/mesh_monitor/templates/index.html "$CLEAN_REPO_DIR/home/natak/mesh_monitor/templates/"
 cp -v /home/natak/mesh_monitor/README.md "$CLEAN_REPO_DIR/home/natak/mesh_monitor/"
+cp -v /home/natak/mesh_monitor/templates/packet_logs.html "$CLEAN_REPO_DIR/home/natak/mesh_monitor/"
 
 # Copy macsec_config_tool files (excluding node subdirectories and mesh_nodes.json)
 cp -v /home/natak/macsec_config_tool/Macsec_config_generator.py "$CLEAN_REPO_DIR/home/natak/macsec_config_tool/"
