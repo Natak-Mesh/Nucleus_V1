@@ -27,9 +27,9 @@
     network_name = mesh_net
     port = /dev/ttyACM0
     frequency = 915000000
-    bandwidth = 125000
+    bandwidth = 250000
     txpower = 20
-    spreadingfactor = 8
+    spreadingfactor = 9
     # CDMA settings next two lines
     # persistence = 255
     # slottime = i
