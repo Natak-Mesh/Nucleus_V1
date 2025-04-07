@@ -18,9 +18,10 @@ ASPECT = "cot"
 ANNOUNCE_INTERVAL = 60  # 1 minute
 PEER_TIMEOUT = 300      # 5 minutes
 STARTUP_DELAY = 10      # 10 seconds for LoRa radio
+LINK_TIMEOUT = 600      # 10 minutes link inactivity timeout
 
 # Retry Configuration
-PACKET_TIMEOUT = 10      # seconds to wait for delivery proof
+PACKET_TIMEOUT = 20      # seconds to wait for delivery proof
 MAX_RETRIES = 3         # maximum number of retry attempts
 
 class ReticulumHandler:
@@ -88,6 +89,7 @@ class ReticulumHandler:
         self.peer_map = {}  # hostname -> destination
         self.last_seen = {} # hostname -> timestamp
         self.packet_map = {} # packet_hash -> filename
+        self.node_links = {}  # hostname -> link object
         self.should_quit = False
         self.message_loops_running = False
         self.message_threads = []
@@ -113,6 +115,9 @@ class ReticulumHandler:
         self.destination.set_packet_callback(self.message_received)
         self.destination.set_proof_strategy(RNS.Destination.PROVE_ALL)
         
+        # Set up link callback
+        self.destination.set_link_established_callback(self.link_established)
+        
         # Set up announce handler
         self.announce_handler = AnnounceHandler(
             aspect_filter=f"{APP_NAME}.{ASPECT}",
@@ -131,6 +136,9 @@ class ReticulumHandler:
         # Start node mode monitoring thread
         self.monitor_thread = threading.Thread(target=self.monitor_node_modes, daemon=True)
         self.monitor_thread.start()
+        
+        # Start establishing links to known nodes
+        self.establish_all_links()
 
     def announce_loop(self):
         """Periodically announce our presence"""
@@ -155,12 +163,27 @@ class ReticulumHandler:
                         self.logger.info(f"Removing stale peer: {hostname}")
                         self.last_seen.pop(hostname, None)
                         self.peer_map.pop(hostname, None)
+                        
+                        # Tear down any link to this stale peer
+                        if hostname in self.node_links:
+                            self.logger.info(f"Tearing down link to stale peer: {hostname}")
+                            try:
+                                self.node_links[hostname].teardown()
+                            except Exception as e:
+                                self.logger.error(f"Error tearing down link: {e}")
+                            self.node_links.pop(hostname, None)
                 
                 # Start or stop message loops based on non-WIFI nodes
                 if non_wifi_nodes and not self.message_loops_running:
                     self.start_message_loops()
                 elif not non_wifi_nodes and self.message_loops_running:
                     self.stop_message_loops()
+                    
+                # Ensure we have links to all non-WiFi nodes
+                for mac in non_wifi_nodes:
+                    hostname = self.get_hostname_for_mac(mac)
+                    if hostname and hostname in self.peer_map and hostname not in self.node_links:
+                        self.establish_link_to_node(hostname)
                     
                 # Sleep briefly before checking again
                 time.sleep(5)
@@ -188,6 +211,163 @@ class ReticulumHandler:
         except Exception as e:
             self.logger.error(f"Error reading identity_map.json: {e}")
             return None
+
+    def establish_all_links(self):
+        """Establish links to all known non-WiFi nodes"""
+        self.logger.info("Establishing links to all known non-WiFi nodes")
+        non_wifi_nodes = self.get_non_wifi_nodes()
+        for mac in non_wifi_nodes:
+            hostname = self.get_hostname_for_mac(mac)
+            if hostname and hostname in self.peer_map and hostname not in self.node_links:
+                self.establish_link_to_node(hostname)
+
+    def establish_link_to_node(self, hostname):
+        """Establish a link to a specific node"""
+        try:
+            if hostname in self.peer_map:
+                dest = self.peer_map[hostname]
+                
+                # Create outgoing destination
+                outgoing_dest = RNS.Destination(
+                    dest,
+                    RNS.Destination.OUT,
+                    RNS.Destination.SINGLE,
+                    APP_NAME,
+                    ASPECT
+                )
+                
+                # Create link
+                link = RNS.Link(outgoing_dest)
+                link.set_link_established_callback(self.outgoing_link_established)
+                link.set_link_closed_callback(self.link_closed)
+                
+                # Store link in our map
+                self.node_links[hostname] = link
+                
+                self.logger.info(f"Establishing link to node: {hostname}")
+                return True
+            else:
+                self.logger.warning(f"Cannot establish link to unknown peer: {hostname}")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error establishing link to {hostname}: {e}")
+            return False
+
+    def outgoing_link_established(self, link):
+        """Callback when an outgoing link is established"""
+        # Find the hostname associated with this link
+        hostname = None
+        for h, l in self.node_links.items():
+            if l == link:
+                hostname = h
+                break
+        
+        if hostname:
+            self.logger.info(f"Link established with node: {hostname}")
+            self.check_pending_files_for_node(hostname)
+        else:
+            self.logger.warning("Link established with unknown node")
+
+    def link_established(self, link):
+        """Callback when an incoming link is established"""
+        self.logger.info(f"Incoming link established from remote node")
+        # Set callbacks for the link
+        link.set_link_closed_callback(self.link_closed)
+        link.set_packet_callback(self.link_packet_received)
+
+    def link_closed(self, link):
+        """Callback when a link is closed"""
+        # Find the hostname associated with this link
+        hostname = None
+        for h, l in self.node_links.items():
+            if l == link:
+                hostname = h
+                self.node_links.pop(h, None)
+                break
+        
+        if hostname:
+            self.logger.info(f"Link closed with node: {hostname}")
+            # Try to re-establish the link if the peer is still known
+            if hostname in self.peer_map and hostname in self.last_seen:
+                self.logger.info(f"Attempting to re-establish link to: {hostname}")
+                self.establish_link_to_node(hostname)
+        else:
+            self.logger.info("Link closed with unknown node")
+
+    def link_packet_received(self, data, packet):
+        """Handle a packet received over a link"""
+        try:
+            # Generate unique filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = f"incoming_{timestamp}.zst"
+            file_path = os.path.join(self.incoming_dir, filename)
+            
+            # Get source information if available
+            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
+            data_size = len(data)
+            
+            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={source_hash}, Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            
+            # Write data to file
+            with open(file_path, 'wb') as f:
+                f.write(data)
+                
+            self.logger.info(f"SAVED: Message saved to {filename}")
+        except Exception as e:
+            self.logger.error(f"Error processing incoming message: {e}")
+
+    def check_pending_files_for_node(self, hostname):
+        """Check if there are pending files for a specific node and send them"""
+        try:
+            if hostname not in self.node_links:
+                return
+                
+            link = self.node_links[hostname]
+            
+            # Get list of .zst files in pending directory
+            pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
+            
+            if pending_files:
+                self.logger.info(f"Found {len(pending_files)} files to process for {hostname}")
+                
+                # Sort by timestamp (assuming filename contains timestamp)
+                pending_files.sort()
+                
+                for filename in pending_files:
+                    # Move file to processing directory
+                    pending_path = os.path.join(self.pending_dir, filename)
+                    processing_path = os.path.join(self.processing_dir, filename)
+                    
+                    # Atomic move
+                    os.rename(pending_path, processing_path)
+                    
+                    # Send file over link
+                    with open(processing_path, 'rb') as f:
+                        file_data = f.read()
+                        
+                        file_size = len(file_data)
+                        timestamp_from_filename = filename.split('_')[1].split('.')[0] if '_' in filename else 'unknown'
+                        
+                        self.logger.info(f"SEND DETAILS: File={filename}, Size={file_size} bytes, To={hostname}, TimestampFromFilename={timestamp_from_filename}")
+                        
+                        # Send packet over the established link
+                        self.send_data_over_link(link, file_data, hostname, filename)
+                        
+                    # Remove file from processing directory
+                    os.remove(processing_path)
+        except Exception as e:
+            self.logger.error(f"Error checking pending files for {hostname}: {e}")
+
+    def send_data_over_link(self, link, data, hostname, filename):
+        """Send data over an established link"""
+        try:
+            packet = RNS.Packet(link, data)
+            packet.send()
+            self.logger.info(f"SENT: {filename} to {hostname} at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error sending data over link: {e}")
+            return False
 
     def start_message_loops(self):
         """Start outgoing and incoming message loops"""
@@ -247,55 +427,95 @@ class ReticulumHandler:
                 with open(processing_path, 'rb') as f:
                     file_data = f.read()
                 
+                # Track whether file was sent to at least one target
+                sent_to_at_least_one = False
+                
                 # Process each target
                 for hostname in target_hostnames:
-                    if hostname in self.peer_map:
-                        dest = self.peer_map[hostname]
+                    # Check if we have an established link to this hostname
+                    if hostname in self.node_links:
+                        link = self.node_links[hostname]
                         
-                        # Create a unique filename for this target
-                        filename_base, filename_ext = os.path.splitext(oldest_file)
-                        target_filename = f"{filename_base}_to_{hostname}{filename_ext}"
-                        target_path = os.path.join(self.sent_buffer_dir, target_filename)
+                        self.logger.info(f"Sending {oldest_file} to {hostname} via established link")
                         
-                        # Create a copy in sent_buffer
-                        with open(target_path, 'wb') as f:
-                            f.write(file_data)
-                        
-                        self.logger.info(f"Sending {oldest_file} to {hostname}")
-                        
-                        # Create outgoing destination
-                        outgoing_dest = RNS.Destination(
-                            dest,
-                            RNS.Destination.OUT,
-                            RNS.Destination.SINGLE,
-                            APP_NAME,
-                            ASPECT
-                        )
-                        
-                        # Enable proofs on this outgoing destination
-                        outgoing_dest.set_proof_strategy(RNS.Destination.PROVE_ALL)
-                        
-                        # Send packet with proof tracking
-                        packet = RNS.Packet(outgoing_dest, file_data)
-                        receipt = packet.send()
-                        if receipt:
-                            self.logger.info(f"TRACKING: Setting up receipt tracking for {target_filename} (packet {RNS.prettyhexrep(receipt.hash)})")
-                            self.logger.info(f"SENT: {oldest_file} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
-                            
-                            # Track packet hash -> filename mapping
-                            self.packet_map[receipt.hash] = target_filename
-                            
-                            # Set callbacks with configured timeout
-                            receipt.set_timeout(PACKET_TIMEOUT)
-                            receipt.set_delivery_callback(self.delivery_confirmed)
-                            receipt.set_timeout_callback(self.delivery_failed)
+                        # Send data over the established link
+                        if self.send_data_over_link(link, file_data, hostname, oldest_file):
+                            sent_to_at_least_one = True
+                    else:
+                        # If no link exists yet, try to establish one
+                        if hostname in self.peer_map:
+                            self.logger.info(f"No link to {hostname}, establishing one...")
+                            if self.establish_link_to_node(hostname):
+                                # If we successfully establish a link, we'll let the
+                                # outgoing_link_established callback handle sending
+                                # data from the pending directory
+                                sent_to_at_least_one = True
+                        else:
+                            # Fall back to packet-based approach for backward compatibility
+                            self.logger.info(f"Using packet-based approach for {hostname} (no peer map entry)")
+                            self.send_via_packet(hostname, oldest_file, file_data)
+                            sent_to_at_least_one = True
                 
-                # Remove the original file from processing directory
+                # Remove file from processing directory
                 os.remove(processing_path)
+                
+                # If we couldn't send to any target, put the file back in pending
+                if target_hostnames and not sent_to_at_least_one:
+                    self.logger.warning(f"Could not send file to any target, will retry later: {oldest_file}")
+                    # We don't need to actually put it back since it will be picked up
+                    # in the next loop iteration from the pending directory
                 
             except Exception as e:
                 self.logger.error(f"Error processing outgoing message: {e}")
                 time.sleep(1)
+                
+    def send_via_packet(self, hostname, filename, file_data):
+        """Send data via traditional packet method (for backward compatibility)"""
+        try:
+            if hostname in self.peer_map:
+                dest = self.peer_map[hostname]
+                
+                # Create a unique filename for this target
+                filename_base, filename_ext = os.path.splitext(filename)
+                target_filename = f"{filename_base}_to_{hostname}{filename_ext}"
+                target_path = os.path.join(self.sent_buffer_dir, target_filename)
+                
+                # Create a copy in sent_buffer
+                with open(target_path, 'wb') as f:
+                    f.write(file_data)
+                
+                # Create outgoing destination
+                outgoing_dest = RNS.Destination(
+                    dest,
+                    RNS.Destination.OUT,
+                    RNS.Destination.SINGLE,
+                    APP_NAME,
+                    ASPECT
+                )
+                
+                # Enable proofs on this outgoing destination
+                outgoing_dest.set_proof_strategy(RNS.Destination.PROVE_ALL)
+                
+                # Send packet with proof tracking
+                packet = RNS.Packet(outgoing_dest, file_data)
+                receipt = packet.send()
+                if receipt:
+                    self.logger.info(f"TRACKING: Setting up receipt tracking for {target_filename} (packet {RNS.prettyhexrep(receipt.hash)})")
+                    self.logger.info(f"SENT: {filename} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
+                    
+                    # Track packet hash -> filename mapping
+                    self.packet_map[receipt.hash] = target_filename
+                    
+                    # Set callbacks with configured timeout
+                    receipt.set_timeout(PACKET_TIMEOUT)
+                    receipt.set_delivery_callback(self.delivery_confirmed)
+                    receipt.set_timeout_callback(self.delivery_failed)
+                    
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"Error sending via packet: {e}")
+            return False
 
     def delivery_confirmed(self, receipt):
         """Handle successful delivery confirmation"""
@@ -453,6 +673,16 @@ class AnnounceHandler:
                 self.parent.last_seen[hostname] = time.time()
                 
                 self.logger.info(f"Updated peer: {hostname} ({RNS.prettyhexrep(destination_hash)})")
+                
+                # If we don't have a link to this node but should, establish one
+                if hostname not in self.parent.node_links:
+                    # Check if this node is currently in non-WiFi mode
+                    non_wifi_nodes = self.parent.get_non_wifi_nodes()
+                    for mac in non_wifi_nodes:
+                        if self.parent.get_hostname_for_mac(mac) == hostname:
+                            self.logger.info(f"Establishing link to announced non-WiFi node: {hostname}")
+                            self.parent.establish_link_to_node(hostname)
+                            break
         except Exception as e:
             self.logger.error(f"Error processing announce: {e}")
 
