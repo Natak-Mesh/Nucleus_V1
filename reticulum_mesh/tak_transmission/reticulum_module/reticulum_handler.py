@@ -8,6 +8,7 @@ import time
 import socket
 import logging
 import threading
+import random
 from datetime import datetime
 
 import RNS
@@ -501,10 +502,17 @@ class AnnounceHandler:
         self.aspect_filter = aspect_filter
         self.parent = parent
         self.logger = logging.getLogger("AnnounceHandler")
+        self.known_peers = set()  # We'll use this to track peers we've seen
 
     def received_announce(self, destination_hash, announced_identity, app_data):
         """Handle incoming announces from other nodes"""
         try:
+            # Check if this is a new peer we haven't seen before
+            is_new_peer = destination_hash not in self.known_peers
+            
+            # Store the peer hash
+            self.known_peers.add(destination_hash)
+            
             if app_data:
                 hostname = app_data.decode() if isinstance(app_data, bytes) else str(app_data)
                 
@@ -523,6 +531,22 @@ class AnnounceHandler:
                             self.logger.info(f"Establishing link to announced non-WiFi node: {hostname}")
                             self.parent.establish_link_to_node(hostname)
                             break
+                
+                # If this is a new peer, respond with our own announce after a delay
+                if is_new_peer:
+                    self.logger.info(f"New peer discovered: {hostname}")
+                    
+                    # Send our own announce after a small random delay
+                    def delayed_announce():
+                        delay = random.uniform(0.5, 2.0)
+                        self.logger.info(f"Sending announce after {delay:.1f}s delay")
+                        time.sleep(delay)
+                        self.parent.destination.announce(app_data=self.parent.hostname.encode())
+                        self.logger.info(f"Announce sent in response to peer discovery")
+                    
+                    # Start announce thread
+                    thread = threading.Thread(target=delayed_announce, daemon=True)
+                    thread.start()
         except Exception as e:
             self.logger.error(f"Error processing announce: {e}")
 
