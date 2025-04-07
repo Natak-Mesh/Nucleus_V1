@@ -88,7 +88,6 @@ class ReticulumHandler:
         self.hostname = socket.gethostname()
         self.peer_map = {}  # hostname -> destination
         self.last_seen = {} # hostname -> timestamp
-        self.packet_map = {} # packet_hash -> filename
         self.node_links = {}  # hostname -> link object
         self.should_quit = False
         self.message_loops_running = False
@@ -450,11 +449,7 @@ class ReticulumHandler:
                                 # outgoing_link_established callback handle sending
                                 # data from the pending directory
                                 sent_to_at_least_one = True
-                        else:
-                            # Fall back to packet-based approach for backward compatibility
-                            self.logger.info(f"Using packet-based approach for {hostname} (no peer map entry)")
-                            self.send_via_packet(hostname, oldest_file, file_data)
-                            sent_to_at_least_one = True
+                        # No else clause - if we can't establish a link, we don't send to this node
                 
                 # Remove file from processing directory
                 os.remove(processing_path)
@@ -469,161 +464,6 @@ class ReticulumHandler:
                 self.logger.error(f"Error processing outgoing message: {e}")
                 time.sleep(1)
                 
-    def send_via_packet(self, hostname, filename, file_data):
-        """Send data via traditional packet method (for backward compatibility)"""
-        try:
-            if hostname in self.peer_map:
-                dest = self.peer_map[hostname]
-                
-                # Create a unique filename for this target
-                filename_base, filename_ext = os.path.splitext(filename)
-                target_filename = f"{filename_base}_to_{hostname}{filename_ext}"
-                target_path = os.path.join(self.sent_buffer_dir, target_filename)
-                
-                # Create a copy in sent_buffer
-                with open(target_path, 'wb') as f:
-                    f.write(file_data)
-                
-                # Create outgoing destination
-                outgoing_dest = RNS.Destination(
-                    dest,
-                    RNS.Destination.OUT,
-                    RNS.Destination.SINGLE,
-                    APP_NAME,
-                    ASPECT
-                )
-                
-                # Enable proofs on this outgoing destination
-                outgoing_dest.set_proof_strategy(RNS.Destination.PROVE_ALL)
-                
-                # Send packet with proof tracking
-                packet = RNS.Packet(outgoing_dest, file_data)
-                receipt = packet.send()
-                if receipt:
-                    self.logger.info(f"TRACKING: Setting up receipt tracking for {target_filename} (packet {RNS.prettyhexrep(receipt.hash)})")
-                    self.logger.info(f"SENT: {filename} to {hostname} (packet {RNS.prettyhexrep(receipt.hash)})")
-                    
-                    # Track packet hash -> filename mapping
-                    self.packet_map[receipt.hash] = target_filename
-                    
-                    # Set callbacks with configured timeout
-                    receipt.set_timeout(PACKET_TIMEOUT)
-                    receipt.set_delivery_callback(self.delivery_confirmed)
-                    receipt.set_timeout_callback(self.delivery_failed)
-                    
-                return True
-            return False
-        except Exception as e:
-            self.logger.error(f"Error sending via packet: {e}")
-            return False
-
-    def delivery_confirmed(self, receipt):
-        """Handle successful delivery confirmation"""
-        # Get filename and extract hostname
-        filename = self.packet_map.pop(receipt.hash, None)
-        if filename:
-            hostname = filename.split('_to_')[-1].split('.')[0]
-            self.logger.info(f"DELIVERY_CONFIRMED: Got proof from {hostname} for packet {RNS.prettyhexrep(receipt.hash)} in {receipt.get_rtt():.3f}s")
-        
-        # Remove from sent_buffer
-        if filename:
-            sent_path = os.path.join(self.sent_buffer_dir, filename)
-            if os.path.exists(sent_path):
-                os.remove(sent_path)
-                self.logger.info(f"DELIVERY_CONFIRMED: Successfully delivered {filename} in {receipt.get_rtt():.3f}s, removed from sent_buffer")
-
-    def delivery_failed(self, receipt):
-        """Handle delivery timeout"""
-        # Get filename and move back to pending for retry
-        filename = self.packet_map.pop(receipt.hash, None)
-        
-        # Enhanced log message with packet ID and node if available
-        if filename:
-            # Try to extract packet ID and node from filename
-            packet_id = "unknown"
-            node = "unknown"
-            
-            try:
-                # Simple regex to extract packet ID and node
-                packet_match = re.search(r'packet_(\d+)', filename)
-                if packet_match:
-                    packet_id = packet_match.group(1)
-                
-                node_match = re.search(r'_to_([^_\.]+)', filename)
-                if node_match:
-                    node = node_match.group(1)
-                    
-                self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {node} (hash: {RNS.prettyhexrep(receipt.hash)}) after {PACKET_TIMEOUT}s")
-            except:
-                # Fallback to original message if parsing fails
-                self.logger.info(f"DELIVERY_FAILED: No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
-        else:
-            # Original message if no filename is found
-            self.logger.info(f"DELIVERY_FAILED: No proof received for packet {RNS.prettyhexrep(receipt.hash)} after {PACKET_TIMEOUT}s")
-        if filename:
-            sent_path = os.path.join(self.sent_buffer_dir, filename)
-            
-            try:
-                # Handle the case where we have multiple "_to_" in the filename
-                # This happens when we retry sending a file that already has a "_to_" in its name
-                if filename.count('_to_') > 1:
-                    # For filenames like "packet_123_retry1_to_nodeA_to_nodeB.zst"
-                    # We need to extract the original part and the final target
-                    last_to_index = filename.rfind('_to_')
-                    base_filename = filename[:last_to_index]  # "packet_123_retry1_to_nodeA"
-                    target_hostname = filename[last_to_index + 4:].split('.')[0]  # "nodeB"
-                    
-                    # Check if this is already a retry
-                    retry_count = 1
-                    retry_match = re.search(r'_retry(\d+)', base_filename)
-                    if retry_match:
-                        retry_count = int(retry_match.group(1)) + 1
-                        # Get the base part without retry suffix
-                        base_part = re.sub(r'_retry\d+', '', base_filename.split('_to_')[0])
-                    else:
-                        base_part = base_filename.split('_to_')[0]
-                else:
-                    # Handle the normal case with a single "_to_"
-                    filename_parts = filename.split('_to_')
-                    if len(filename_parts) != 2:
-                        self.logger.error(f"RETRY_FAILED: Invalid filename format: {filename}")
-                        if os.path.exists(sent_path):
-                            os.remove(sent_path)
-                        return
-                    
-                    base_part = filename_parts[0]  # original_filename or original_filename_retry#
-                    target_hostname = filename_parts[1].split('.')[0]  # hostname
-                    
-                    # Check if this is already a retry
-                    retry_count = 1
-                    retry_match = re.search(r'_retry(\d+)$', base_part)
-                    if retry_match:
-                        retry_count = int(retry_match.group(1)) + 1
-                        # Remove the old retry suffix
-                        base_part = re.sub(r'_retry\d+$', '', base_part)
-                
-                # Check max retries
-                if retry_count > MAX_RETRIES:
-                    self.logger.error(f"RETRY_FAILED: Max retries ({MAX_RETRIES}) reached for {filename}, dropping packet")
-                    if os.path.exists(sent_path):
-                        os.remove(sent_path)
-                    return
-                
-                # Create new filename with retry counter
-                new_base = f"{base_part}_retry{retry_count}"
-                new_filename = f"{new_base}_to_{target_hostname}.zst"
-                pending_path = os.path.join(self.pending_dir, new_filename)
-                
-                if os.path.exists(sent_path):
-                    # Move back to pending with updated filename
-                    os.rename(sent_path, pending_path)
-                    self.logger.info(f"RETRY_ATTEMPT: Moving {filename} to {new_filename} for retry {retry_count}/{MAX_RETRIES}")
-            
-            except Exception as e:
-                self.logger.error(f"RETRY_FAILED: Error processing retry for {filename}: {e}")
-                if os.path.exists(sent_path):
-                    os.remove(sent_path)
-
     def message_received(self, data, packet):
         """Handle incoming messages"""
         try:
