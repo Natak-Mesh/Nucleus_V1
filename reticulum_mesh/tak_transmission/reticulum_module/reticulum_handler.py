@@ -503,6 +503,7 @@ class AnnounceHandler:
         self.parent = parent
         self.logger = logging.getLogger("AnnounceHandler")
         self.known_peers = set()  # We'll use this to track peers we've seen
+        self.hostname_identities = {}  # Track identities per hostname
 
     def received_announce(self, destination_hash, announced_identity, app_data):
         """Handle incoming announces from other nodes"""
@@ -515,6 +516,26 @@ class AnnounceHandler:
             
             if app_data:
                 hostname = app_data.decode() if isinstance(app_data, bytes) else str(app_data)
+                
+                # Check if the identity for this hostname has changed
+                identity_changed = False
+                if hostname in self.hostname_identities:
+                    # Compare the identity public key to detect changes
+                    old_identity = self.hostname_identities[hostname]
+                    if old_identity.get_public_key() != announced_identity.get_public_key():
+                        self.logger.info(f"Identity changed for {hostname}, treating as new peer")
+                        identity_changed = True
+                        # If we have a link to this node, tear it down since the identity changed
+                        if hostname in self.parent.node_links:
+                            self.logger.info(f"Tearing down link to node with changed identity: {hostname}")
+                            try:
+                                self.parent.node_links[hostname].teardown()
+                            except Exception as e:
+                                self.logger.error(f"Error tearing down link: {e}")
+                            self.parent.node_links.pop(hostname, None)
+                
+                # Store the identity for this hostname
+                self.hostname_identities[hostname] = announced_identity
                 
                 # Store destination and update last seen time
                 self.parent.peer_map[hostname] = announced_identity
@@ -532,9 +553,9 @@ class AnnounceHandler:
                             self.parent.establish_link_to_node(hostname)
                             break
                 
-                # If this is a new peer, respond with our own announce after a delay
-                if is_new_peer:
-                    self.logger.info(f"New peer discovered: {hostname}")
+                # If this is a new peer or the identity changed, respond with our own announce after a delay
+                if is_new_peer or identity_changed:
+                    self.logger.info(f"New peer or changed identity discovered: {hostname}")
                     
                     # Send our own announce after a small random delay
                     def delayed_announce():
