@@ -204,6 +204,19 @@
         .stale-text {
             color: var(--danger-color);
         }
+        
+        /* Link event styles */
+        .link-established {
+            border-left: 4px solid #4caf50; /* Green */
+        }
+        
+        .link-closed {
+            border-left: 4px solid #ff9800; /* Orange */
+        }
+        
+        .link-card {
+            border-left: 4px solid #2196F3; /* Blue */
+        }
 
         /* Pull to refresh styles */
         .ptr-element {
@@ -306,7 +319,7 @@
                     document.getElementById('wlanMac').textContent = data.local_info.wlan_mac;
                     document.getElementById('localIp').textContent = data.local_info.ip;
                     document.getElementById('nodeCount').textContent = data.nodes.length;
-                    displayMeshData(data.nodes, data.reticulum_peers, data.local_info);
+                    displayMeshData(data.nodes, data.reticulum_peers, data.local_info, data.active_links, data.link_events);
                     document.getElementById('lastUpdate').textContent = 
                         `Updated: ${new Date().toLocaleTimeString()}`;
                     document.getElementById('connectionStatus').className = 
@@ -334,7 +347,7 @@
             }
         });
 
-        function displayMeshData(nodes, reticulumPeers, localInfo) {
+        function displayMeshData(nodes, reticulumPeers, localInfo, activeLinks, linkEvents) {
             let html = '<h3>Wi-Fi Connections</h3>';
             html += '<div class="node-cards">';
             nodes.forEach(node => {
@@ -392,6 +405,89 @@
                 </div>
             `;
 
+            // Add Active Links section
+            html += '<h3>Active Reticulum Links</h3>';
+            
+            if (activeLinks && activeLinks.length > 0) {
+                html += '<div class="node-cards">';
+                activeLinks.forEach(link => {
+                    const directionIcon = link.direction === 'incoming' ? '←' : '→';
+                    html += `
+                        <div class="reticulum-card link-card">
+                            <div class="info-item">
+                                <span class="label">Hostname:</span>
+                                <span class="value">${link.hostname} ${directionIcon}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Status:</span>
+                                <span class="value">${link.status}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Established:</span>
+                                <span class="value">${link.established_at}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Last Activity:</span>
+                                <span class="value">${link.last_activity}</span>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="reticulum-card"><div class="info-item">No active links</div></div>';
+            }
+            
+            // Add Recent Link Events section
+            html += '<h3>Recent Link Events</h3>';
+            
+            if (linkEvents && linkEvents.length > 0) {
+                html += '<div class="node-cards">';
+                linkEvents.forEach(event => {
+                    let eventClass = '';
+                    let eventIcon = '';
+                    
+                    if (event.type === 'established') {
+                        eventClass = 'link-established';
+                        eventIcon = '🔗';
+                    } else if (event.type === 'closed') {
+                        eventClass = 'link-closed';
+                        eventIcon = '✂️';
+                    }
+                    
+                    let details = '';
+                    if (event.age) {
+                        details += `Age: ${event.age}`;
+                    }
+                    if (event.inactive) {
+                        details += details ? `, Inactive: ${event.inactive}` : `Inactive: ${event.inactive}`;
+                    }
+                    if (event.direction) {
+                        const dirIcon = event.direction === 'incoming' ? '←' : '→';
+                        details += details ? `, ${dirIcon}` : dirIcon;
+                    }
+                    
+                    html += `
+                        <div class="reticulum-card ${eventClass}">
+                            <div class="info-item">
+                                <span class="label">${eventIcon} ${event.type.charAt(0).toUpperCase() + event.type.slice(1)}:</span>
+                                <span class="value">${event.hostname}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Time:</span>
+                                <span class="value">${event.timestamp}</span>
+                            </div>
+                            ${details ? `<div class="info-item">
+                                <span class="label">Details:</span>
+                                <span class="value">${details}</span>
+                            </div>` : ''}
+                        </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="reticulum-card"><div class="info-item">No recent link events</div></div>';
+            }
+            
+            // Add Reticulum Peers section
             html += '<h3>Reticulum Peers</h3>';
             
             if (Object.keys(reticulumPeers).length > 0) {

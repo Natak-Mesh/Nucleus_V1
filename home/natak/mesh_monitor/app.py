@@ -5,6 +5,7 @@ import os
 import time
 import logging
 import subprocess
+import re
 from functools import partial
 
 app = Flask(__name__)
@@ -23,12 +24,17 @@ STATUS_PATH = '/home/natak/reticulum_mesh/ogm_monitor/status.json'
 RNS_STATUS_PATH = '/home/natak/reticulum_mesh/rns_stats/rns_status.json'
 PACKET_LOG_PATH = '/home/natak/reticulum_mesh/logs/packet_logs.log'
 
+# Link status tracking
+active_links = {}  # hostname -> link status
+link_events = []   # recent link events (establish/close)
+
 # Cache for file data to avoid reading files on every request
 file_cache = {
     'node_modes': {'data': None, 'timestamp': 0},
     'identity_map': {'data': None, 'timestamp': 0},
     'status': {'data': None, 'timestamp': 0},
-    'rns_status': {'data': None, 'timestamp': 0}
+    'rns_status': {'data': None, 'timestamp': 0},
+    'packet_logs': {'data': None, 'timestamp': 0}
 }
 
 # Cache expiration time in seconds
@@ -229,10 +235,113 @@ def read_packet_logs():
             for line in f:
                 lines.append(line)
                 
-        return [line.strip() for line in lines]
+        # Process logs to extract link information
+        logs = [line.strip() for line in lines]
+        process_link_events(logs)
+        
+        return logs
     except Exception as e:
         app.logger.error(f"Error reading packet logs: {e}")
         return []
+
+def process_link_events(logs):
+    """Process packet logs to extract link events and status"""
+    global active_links, link_events
+    
+    # Keep only the most recent 20 link events
+    if len(link_events) > 20:
+        link_events = link_events[-20:]
+    
+    for log in logs:
+        # Skip log entries without timestamp
+        if not ' - ' in log:
+            continue
+            
+        # Extract timestamp and message
+        parts = log.split(' - ', 1)
+        if len(parts) < 2:
+            continue
+            
+        timestamp, message = parts
+        
+        # Process link established events
+        if 'LINK_ESTABLISHED' in message:
+            # Extract hostname
+            if 'from' in message:
+                # Incoming link
+                hostname_match = re.search(r'from (\w+)', message)
+                direction = 'incoming'
+            elif 'to' in message:
+                # Outgoing link
+                hostname_match = re.search(r'to (\w+)', message)
+                direction = 'outgoing'
+            else:
+                hostname_match = None
+                direction = 'unknown'
+                
+            if hostname_match:
+                hostname = hostname_match.group(1)
+                if hostname != 'unknown':
+                    # Update active links
+                    active_links[hostname] = {
+                        'status': 'active',
+                        'established_at': timestamp,
+                        'last_activity': timestamp,
+                        'direction': direction
+                    }
+                    
+                    # Add to link events
+                    link_events.append({
+                        'type': 'established',
+                        'hostname': hostname,
+                        'timestamp': timestamp,
+                        'direction': direction
+                    })
+        
+        # Process link closed events
+        elif 'LINK_CLOSED' in message:
+            # Extract hostname
+            hostname_match = re.search(r'with (\w+)', message)
+            
+            # Extract age and inactive time if available
+            age_match = re.search(r'Age: ([^,]+)', message)
+            inactive_match = re.search(r'Inactive: ([^)]+)', message)
+            
+            if hostname_match:
+                hostname = hostname_match.group(1)
+                if hostname != 'unknown':
+                    # Remove from active links
+                    if hostname in active_links:
+                        active_links.pop(hostname, None)
+                    
+                    # Add to link events
+                    event = {
+                        'type': 'closed',
+                        'hostname': hostname,
+                        'timestamp': timestamp
+                    }
+                    
+                    if age_match:
+                        event['age'] = age_match.group(1)
+                    
+                    if inactive_match:
+                        event['inactive'] = inactive_match.group(1)
+                        
+                    link_events.append(event)
+        
+        # Process link data events to update last activity
+        elif 'LINK_DATA_RECEIVED' in message or 'SENT:' in message:
+            # Extract hostname
+            if 'LINK_DATA_RECEIVED' in message:
+                hostname_match = re.search(r'Source=(\w+)', message)
+            else:  # SENT
+                hostname_match = re.search(r'to (\w+)', message)
+                
+            if hostname_match:
+                hostname = hostname_match.group(1)
+                if hostname != 'unknown' and hostname in active_links:
+                    # Update last activity
+                    active_links[hostname]['last_activity'] = timestamp
 
 def generate_packet_log_events():
     """Generate SSE events with packet log data"""
@@ -263,6 +372,31 @@ def packet_log_events():
     )
 
 
+def get_active_links():
+    """Get information about active Reticulum links"""
+    # Make sure we have the latest link information
+    read_packet_logs()
+    
+    # Convert active_links to a list for the API
+    links = []
+    for hostname, link_info in active_links.items():
+        links.append({
+            'hostname': hostname,
+            'status': link_info.get('status', 'unknown'),
+            'established_at': link_info.get('established_at', 'unknown'),
+            'last_activity': link_info.get('last_activity', 'unknown'),
+            'direction': link_info.get('direction', 'unknown')
+        })
+    
+    return links
+
+def get_link_events():
+    """Get recent link events (establish/close)"""
+    # Make sure we have the latest link information
+    read_packet_logs()
+    
+    return link_events
+
 @app.route('/get_mesh_data')
 def get_mesh_data():
     # Get local node info
@@ -276,19 +410,27 @@ def get_mesh_data():
         
         # Process Reticulum peers
         reticulum_peers = process_reticulum_peers()
+        
+        # Get active links and link events
+        active_links_data = get_active_links()
+        link_events_data = get_link_events()
     except Exception as e:
         app.logger.error(f"Unexpected error processing mesh data: {e}")
         success = False
         error = "An unexpected error occurred"
         nodes = []
         reticulum_peers = {}
+        active_links_data = []
+        link_events_data = []
     
     return jsonify({
         'success': success,
         'error': error,
         'local_info': local_info,
         'nodes': nodes,
-        'reticulum_peers': reticulum_peers
+        'reticulum_peers': reticulum_peers,
+        'active_links': active_links_data,
+        'link_events': link_events_data
     })
 
 def generate_events():
@@ -301,7 +443,9 @@ def generate_events():
                 'error': None,
                 'local_info': get_local_info(),
                 'nodes': process_wifi_nodes(),
-                'reticulum_peers': process_reticulum_peers()
+                'reticulum_peers': process_reticulum_peers(),
+                'active_links': get_active_links(),
+                'link_events': get_link_events()
             }
             
             # Send the event

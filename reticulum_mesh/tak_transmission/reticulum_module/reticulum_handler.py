@@ -263,63 +263,16 @@ class ReticulumHandler:
                 break
         
         if hostname:
-            self.logger.info(f"Link established with node: {hostname}")
+            self.logger.info(f"LINK_ESTABLISHED: Outgoing link to {hostname}")
             self.check_pending_files_for_node(hostname)
         else:
-            self.logger.warning("Link established with unknown node")
-
-    def link_established(self, link):
-        """Callback when an incoming link is established"""
-        self.logger.info(f"Incoming link established from remote node")
-        # Set callbacks for the link
-        link.set_link_closed_callback(self.link_closed)
-        link.set_packet_callback(self.link_packet_received)
-
-    def link_closed(self, link):
-        """Callback when a link is closed"""
-        # Find the hostname associated with this link
-        hostname = None
-        for h, l in self.node_links.items():
-            if l == link:
-                hostname = h
-                self.node_links.pop(h, None)
-                break
-        
-        if hostname:
-            self.logger.info(f"Link closed with node: {hostname}")
-            # Try to re-establish the link if the peer is still known
-            if hostname in self.peer_map and hostname in self.last_seen:
-                self.logger.info(f"Attempting to re-establish link to: {hostname}")
-                self.establish_link_to_node(hostname)
-        else:
-            self.logger.info("Link closed with unknown node")
-
-    def link_packet_received(self, data, packet):
-        """Handle a packet received over a link"""
-        try:
-            # Generate unique filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            filename = f"incoming_{timestamp}.zst"
-            file_path = os.path.join(self.incoming_dir, filename)
+            self.logger.warning("LINK_ESTABLISHED: Outgoing link to unknown node")
             
-            # Get source information if available
-            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
-            data_size = len(data)
-            
-            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={source_hash}, Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-            
-            # Write data to file
-            with open(file_path, 'wb') as f:
-                f.write(data)
-                
-            self.logger.info(f"SAVED: Message saved to {filename}")
-        except Exception as e:
-            self.logger.error(f"Error processing incoming message: {e}")
-
     def check_pending_files_for_node(self, hostname):
-        """Check if there are pending files for a specific node and send them"""
+        """Check for pending files to send to a specific node"""
         try:
             if hostname not in self.node_links:
+                self.logger.warning(f"Cannot check pending files: No active link to {hostname}")
                 return
                 
             link = self.node_links[hostname]
@@ -355,8 +308,126 @@ class ReticulumHandler:
                         
                     # Remove file from processing directory
                     os.remove(processing_path)
+            else:
+                self.logger.debug(f"No pending files for {hostname}")
         except Exception as e:
             self.logger.error(f"Error checking pending files for {hostname}: {e}")
+
+    def link_established(self, link):
+        """Callback when an incoming link is established"""
+        # Try to find hostname if possible
+        hostname = "unknown"
+        if hasattr(link, 'destination') and hasattr(link.destination, 'hash'):
+            for h, dest in self.peer_map.items():
+                if hasattr(dest, 'hash') and dest.hash == link.destination.hash:
+                    hostname = h
+                    break
+                    
+        self.logger.info(f"LINK_ESTABLISHED: Incoming link from {hostname}")
+        # Set callbacks for the link
+        link.set_link_closed_callback(self.link_closed)
+        link.set_packet_callback(self.link_packet_received)
+
+    def link_closed(self, link):
+        """Callback when a link is closed"""
+        # Find the hostname associated with this link
+        hostname = None
+        for h, l in self.node_links.items():
+            if l == link:
+                hostname = h
+                self.node_links.pop(h, None)
+                break
+        
+        # Get link age if available
+        link_age = "unknown"
+        try:
+            if hasattr(link, 'get_age'):
+                link_age = f"{link.get_age():.1f}s"
+        except Exception:
+            pass
+            
+        # Get inactive time if available
+        inactive_time = "unknown"
+        try:
+            if hasattr(link, 'inactive_for'):
+                inactive_time = f"{link.inactive_for():.1f}s"
+        except Exception:
+            pass
+        
+        if hostname:
+            self.logger.info(f"LINK_CLOSED: Link with {hostname} closed (Age: {link_age}, Inactive: {inactive_time})")
+            # Try to re-establish the link if the peer is still known
+            if hostname in self.peer_map and hostname in self.last_seen:
+                self.logger.info(f"Attempting to re-establish link to: {hostname}")
+                self.establish_link_to_node(hostname)
+        else:
+            self.logger.info(f"LINK_CLOSED: Link with unknown node closed (Age: {link_age}, Inactive: {inactive_time})")
+
+    def link_packet_received(self, data, packet):
+        """Handle a packet received over a link"""
+        try:
+            # Try to find hostname for the source if possible
+            hostname = "unknown"
+            if hasattr(packet, 'source_hash'):
+                for h, dest in self.peer_map.items():
+                    if hasattr(dest, 'hash') and dest.hash == packet.source_hash:
+                        hostname = h
+                        break
+            
+            # Generate unique filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = f"incoming_{timestamp}.zst"
+            file_path = os.path.join(self.incoming_dir, filename)
+            
+            # Get source information if available
+            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
+            data_size = len(data)
+            
+            self.logger.info(f"LINK_DATA_RECEIVED: Size={data_size} bytes, Source={hostname}({source_hash}), Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            
+            # Write data to file
+            with open(file_path, 'wb') as f:
+                f.write(data)
+                
+            self.logger.info(f"SAVED: Message saved to {filename}")
+            
+            # Check if we have a link to this hostname
+            if hostname != "unknown" and hostname in self.node_links:
+                link = self.node_links[hostname]
+                
+                # Get list of .zst files in pending directory
+                pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
+                
+                if pending_files:
+                    self.logger.info(f"Found {len(pending_files)} files to process for {hostname}")
+                    
+                    # Sort by timestamp (assuming filename contains timestamp)
+                    pending_files.sort()
+                    
+                    for filename in pending_files:
+                        # Move file to processing directory
+                        pending_path = os.path.join(self.pending_dir, filename)
+                        processing_path = os.path.join(self.processing_dir, filename)
+                        
+                        # Atomic move
+                        os.rename(pending_path, processing_path)
+                        
+                        # Send file over link
+                        with open(processing_path, 'rb') as f:
+                            file_data = f.read()
+                            
+                            file_size = len(file_data)
+                            timestamp_from_filename = filename.split('_')[1].split('.')[0] if '_' in filename else 'unknown'
+                            
+                            self.logger.info(f"SEND DETAILS: File={filename}, Size={file_size} bytes, To={hostname}, TimestampFromFilename={timestamp_from_filename}")
+                            
+                            # Send packet over the established link
+                            self.send_data_over_link(link, file_data, hostname, filename)
+                            
+                        # Remove file from processing directory
+                        os.remove(processing_path)
+        except Exception as e:
+            self.logger.error(f"Error processing incoming message: {e}")
 
     def send_data_over_link(self, link, data, hostname, filename):
         """Send data over an established link"""
@@ -468,6 +539,14 @@ class ReticulumHandler:
     def message_received(self, data, packet):
         """Handle incoming messages"""
         try:
+            # Try to find hostname for the source if possible
+            hostname = "unknown"
+            if hasattr(packet, 'source_hash'):
+                for h, dest in self.peer_map.items():
+                    if hasattr(dest, 'hash') and dest.hash == packet.source_hash:
+                        hostname = h
+                        break
+            
             # Get source information if available
             source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
             data_size = len(data)
@@ -481,7 +560,7 @@ class ReticulumHandler:
             with open(file_path, 'wb') as f:
                 f.write(data)
             
-            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={source_hash}, Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={hostname}({source_hash}), Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
             self.logger.info(f"SAVED: Message saved to {filename}")
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")
