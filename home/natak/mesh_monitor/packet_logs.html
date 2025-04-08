@@ -379,7 +379,20 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
                 else if (cleanLog.includes('INCOMING:')) {
                     // Extract just the size and source, ignoring timestamp and Time field
                     const sizeMatch = cleanLog.match(/Size=(\d+) bytes/);
-                    const sourceMatch = cleanLog.match(/Source=(\w+)/);
+                    
+                    // Extract source with hash pattern
+                    let sourceMatch = cleanLog.match(/Source=([^(]+)\(([^)]+)\)/);
+                    let source = "unknown";
+                    let sourceHash = "";
+                    
+                    if (sourceMatch) {
+                        source = sourceMatch[1];
+                        sourceHash = sourceMatch[2];
+                    } else {
+                        // Fallback to simple source extraction
+                        let simpleSourceMatch = cleanLog.match(/Source=([^,]+)/);
+                        source = simpleSourceMatch ? simpleSourceMatch[1] : "unknown";
+                    }
                     
                     // Try to extract packet ID from filename or generate one from timestamp
                     let packetId = "unknown";
@@ -396,8 +409,13 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
                     
                     if (sizeMatch) {
                         const size = sizeMatch[1];
-                        const source = sourceMatch ? sourceMatch[1] : "unknown";
-                        formattedLog = `INCOMING: #${packetId} from ${source} (${size} bytes)`;
+                        let sourceDisplay = source.trim();
+                        if (sourceHash) {
+                            // Only show hash if source is still unknown
+                            sourceDisplay = sourceDisplay === "unknown" ? 
+                                `unknown (${sourceHash})` : sourceDisplay;
+                        }
+                        formattedLog = `INCOMING: #${packetId} from ${sourceDisplay} (${size} bytes)`;
                         entry.classList.add('incoming');
                     }
                 }
@@ -502,8 +520,19 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
                     let sizeMatch = cleanLog.match(/Size=(\d+) bytes/);
                     let size = sizeMatch ? sizeMatch[1] : "unknown";
                     
-                    let sourceMatch = cleanLog.match(/Source=([^,]+)/);
-                    let source = sourceMatch ? sourceMatch[1] : "unknown";
+                    // Extract source with hash pattern
+                    let sourceMatch = cleanLog.match(/Source=([^(]+)\(([^)]+)\)/);
+                    let source = "unknown";
+                    let sourceHash = "";
+                    
+                    if (sourceMatch) {
+                        source = sourceMatch[1];
+                        sourceHash = sourceMatch[2];
+                    } else {
+                        // Fallback to simple source extraction
+                        let simpleSourceMatch = cleanLog.match(/Source=([^,]+)/);
+                        source = simpleSourceMatch ? simpleSourceMatch[1] : "unknown";
+                    }
                     
                     // Extract link ID
                     let linkIdMatch = cleanLog.match(/Link=([^,]+)/);
@@ -513,7 +542,8 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
                     let metricsMatch = cleanLog.match(/\[(.*?)\]/);
                     let metrics = metricsMatch ? ` [${metricsMatch[1]}]` : "";
                     
-                    formattedLog = `LINK DATA RECEIVED: ${size} bytes from ${source} (${linkId})${metrics}`;
+                    let sourceDisplay = sourceHash ? `${source} (${sourceHash})` : source;
+                    formattedLog = `LINK DATA RECEIVED: ${size} bytes from ${sourceDisplay}${metrics}`;
                     entry.classList.add('link-data-received');
                 }
                 else {

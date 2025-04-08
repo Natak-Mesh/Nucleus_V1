@@ -368,11 +368,16 @@ class ReticulumHandler:
         try:
             # Try to find hostname for the source if possible
             hostname = "unknown"
-            if hasattr(packet, 'source_hash'):
-                for h, dest in self.peer_map.items():
-                    if hasattr(dest, 'hash') and dest.hash == packet.source_hash:
+            
+            # Check if this packet came from a known link
+            for h, link in self.node_links.items():
+                if link and hasattr(link, 'destination') and hasattr(link.destination, 'hash') and hasattr(packet, 'source_hash'):
+                    if link.destination.hash == packet.source_hash:
                         hostname = h
                         break
+            
+            # Get source information if available
+            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
             
             # Generate unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")

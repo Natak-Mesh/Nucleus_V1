@@ -348,49 +348,8 @@
         });
 
         function displayMeshData(nodes, reticulumPeers, localInfo, activeLinks, linkEvents) {
-            let html = '<h3>Wi-Fi Connections</h3>';
-            html += '<div class="node-cards">';
-            nodes.forEach(node => {
-                const isHighLatency = node.last_seen > 20;
-                const cardId = `node-${node.mac.replace(/:/g, '')}`;
-                
-                html += `
-                    <div class="node-card ${isHighLatency ? 'high-latency' : ''}" id="${cardId}" onclick="toggleNodeDetails(this)">
-                        <div class="info-item">
-                            <span class="label">Hostname:</span>
-                            <span class="value">${node.hostname}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">MAC:</span>
-                            <span class="value">${node.mac}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">Next Hop:</span>
-                            <span class="value">${node.nexthop}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">IP:</span>
-                            <span class="value">${node.ip}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">Mode:</span>
-                            <span class="value">${node.mode || 'Unknown'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">Throughput:</span>
-                            <span class="value">${node.throughput} Mbps</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">Last Seen:</span>
-                            <span class="value ${isHighLatency ? 'high-latency' : ''}">${node.last_seen.toFixed(2)}s
-                                ${isHighLatency ? '<span class="warning">High Latency</span>' : ''}
-                            </span>
-                        </div>
-                    </div>`;
-            });
-            html += '</div>';
-
-            // Add Reticulum peers section
+            let html = '';
+            
             // Add Local Node Reticulum Info
             html += `
                 <div class="reticulum-card">
@@ -404,8 +363,8 @@
                     </div>
                 </div>
             `;
-
-            // Add Active Links section
+            
+            // Add Active Links section first
             html += '<h3>Active Reticulum Links</h3>';
             
             if (activeLinks && activeLinks.length > 0) {
@@ -436,6 +395,49 @@
             } else {
                 html += '<div class="reticulum-card"><div class="info-item">No active links</div></div>';
             }
+            
+            // Then Wi-Fi Connections
+            html += '<h3>Wi-Fi Connections</h3>';
+            html += '<div class="node-cards">';
+            nodes.forEach(node => {
+                const isHighLatency = node.last_seen > 20;
+                const cardId = `node-${node.mac.replace(/:/g, '')}`;
+                
+                html += `
+                    <div class="node-card ${isHighLatency ? 'high-latency' : ''}" id="${cardId}" onclick="toggleNodeDetails(this)">
+                        <div class="info-item">
+                            <span class="label">Hostname:</span>
+                            <span class="value">${node.hostname}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">MAC:</span>
+                            <span class="value">${node.mac}</span>
+                        </div>
+                        <div class="info-item details" style="display: none;">
+                            <span class="label">Next Hop:</span>
+                            <span class="value">${node.nexthop}</span>
+                        </div>
+                        <div class="info-item details" style="display: none;">
+                            <span class="label">IP:</span>
+                            <span class="value">${node.ip}</span>
+                        </div>
+                        <div class="info-item details" style="display: none;">
+                            <span class="label">Mode:</span>
+                            <span class="value">${node.mode || 'Unknown'}</span>
+                        </div>
+                        <div class="info-item details" style="display: none;">
+                            <span class="label">Throughput:</span>
+                            <span class="value">${node.throughput} Mbps</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Last Seen:</span>
+                            <span class="value ${isHighLatency ? 'high-latency' : ''}">${node.last_seen.toFixed(2)}s
+                                ${isHighLatency ? '<span class="warning">High Latency</span>' : ''}
+                            </span>
+                        </div>
+                    </div>`;
+            });
+            html += '</div>';
             
             // Add Recent Link Events section
             html += '<h3>Recent Link Events</h3>';

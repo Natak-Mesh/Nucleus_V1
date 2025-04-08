@@ -27,6 +27,7 @@ PACKET_LOG_PATH = '/home/natak/reticulum_mesh/logs/packet_logs.log'
 # Link status tracking
 active_links = {}  # hostname -> link status
 link_events = []   # recent link events (establish/close)
+seen_events = set()  # Set to track seen events to prevent duplicates
 
 # Cache for file data to avoid reading files on every request
 file_cache = {
@@ -220,6 +221,37 @@ def home():
 def packet_logs():
     return render_template('packet_logs.html', hostname=socket.gethostname())
 
+def get_hash_to_hostname_mapping():
+    """Create a mapping from hash to hostname using rns_status.json"""
+    mapping = {}
+    rns_status = get_reticulum_status()
+    
+    for hash_id, peer_data in rns_status.items():
+        hostname = peer_data.get('hostname', peer_data.get('name', None))
+        if hostname:
+            # Clean the hash (remove angle brackets)
+            clean_hash = hash_id.replace('<', '').replace('>', '')
+            mapping[clean_hash] = hostname
+            # Also add the hash with angle brackets as a key
+            mapping[hash_id] = hostname
+    
+    return mapping
+
+def resolve_unknown_hostnames(log_line, hash_to_hostname):
+    """Replace 'unknown' hostnames with actual hostnames if possible"""
+    if 'unknown' not in log_line:
+        return log_line
+        
+    # Look for source hash patterns in the log line
+    source_hash_match = re.search(r'Source=unknown\(([^)]+)\)', log_line)
+    if source_hash_match:
+        source_hash = source_hash_match.group(1)
+        if source_hash in hash_to_hostname:
+            hostname = hash_to_hostname[source_hash]
+            return log_line.replace(f'Source=unknown({source_hash})', f'Source={hostname}({source_hash})')
+    
+    return log_line
+
 def read_packet_logs():
     """Read the most recent packet log entries (last 100 lines)"""
     try:
@@ -234,9 +266,18 @@ def read_packet_logs():
         with open(PACKET_LOG_PATH, 'r') as f:
             for line in f:
                 lines.append(line)
-                
-        # Process logs to extract link information
-        logs = [line.strip() for line in lines]
+        
+        # Get hash to hostname mapping
+        hash_to_hostname = get_hash_to_hostname_mapping()
+        
+        # Process logs to extract link information and resolve hostnames
+        logs = []
+        for line in lines:
+            line = line.strip()
+            # Resolve unknown hostnames
+            line = resolve_unknown_hostnames(line, hash_to_hostname)
+            logs.append(line)
+            
         process_link_events(logs)
         
         return logs
@@ -246,11 +287,7 @@ def read_packet_logs():
 
 def process_link_events(logs):
     """Process packet logs to extract link events and status"""
-    global active_links, link_events
-    
-    # Keep only the most recent 20 link events
-    if len(link_events) > 20:
-        link_events = link_events[-20:]
+    global active_links, link_events, seen_events
     
     for log in logs:
         # Skip log entries without timestamp
@@ -290,13 +327,20 @@ def process_link_events(logs):
                         'direction': direction
                     }
                     
-                    # Add to link events
-                    link_events.append({
-                        'type': 'established',
-                        'hostname': hostname,
-                        'timestamp': timestamp,
-                        'direction': direction
-                    })
+                    # Create event key for deduplication
+                    event_key = f"established-{hostname}-{timestamp}"
+                    
+                    # Only add if not a duplicate
+                    if event_key not in seen_events:
+                        seen_events.add(event_key)
+                        
+                        # Add to link events
+                        link_events.append({
+                            'type': 'established',
+                            'hostname': hostname,
+                            'timestamp': timestamp,
+                            'direction': direction
+                        })
         
         # Process link closed events
         elif 'LINK_CLOSED' in message:
@@ -314,20 +358,27 @@ def process_link_events(logs):
                     if hostname in active_links:
                         active_links.pop(hostname, None)
                     
-                    # Add to link events
-                    event = {
-                        'type': 'closed',
-                        'hostname': hostname,
-                        'timestamp': timestamp
-                    }
+                    # Create event key for deduplication
+                    event_key = f"closed-{hostname}-{timestamp}"
                     
-                    if age_match:
-                        event['age'] = age_match.group(1)
-                    
-                    if inactive_match:
-                        event['inactive'] = inactive_match.group(1)
+                    # Only add if not a duplicate
+                    if event_key not in seen_events:
+                        seen_events.add(event_key)
                         
-                    link_events.append(event)
+                        # Add to link events
+                        event = {
+                            'type': 'closed',
+                            'hostname': hostname,
+                            'timestamp': timestamp
+                        }
+                        
+                        if age_match:
+                            event['age'] = age_match.group(1)
+                        
+                        if inactive_match:
+                            event['inactive'] = inactive_match.group(1)
+                            
+                        link_events.append(event)
         
         # Process link data events to update last activity
         elif 'LINK_DATA_RECEIVED' in message or 'SENT:' in message:
@@ -342,6 +393,10 @@ def process_link_events(logs):
                 if hostname != 'unknown' and hostname in active_links:
                     # Update last activity
                     active_links[hostname]['last_activity'] = timestamp
+    
+    # Keep only the most recent 4 link events
+    if len(link_events) > 4:
+        link_events = link_events[-4:]
 
 def generate_packet_log_events():
     """Generate SSE events with packet log data"""
@@ -377,6 +432,25 @@ def get_active_links():
     # Make sure we have the latest link information
     read_packet_logs()
     
+    # For debugging
+    app.logger.info(f"Active links: {active_links}")
+    
+    # If there are no active links in the packet logs, use peers from RNS status
+    if not active_links:
+        rns_status = get_reticulum_status()
+        local_hostname = socket.gethostname()
+        
+        for hash_id, peer_data in rns_status.items():
+            hostname = peer_data.get('hostname', 'Unknown')
+            if hostname != local_hostname:
+                # Add as an active link
+                active_links[hostname] = {
+                    'status': 'active',
+                    'established_at': 'From RNS status',
+                    'last_activity': 'From RNS status',
+                    'direction': 'unknown'
+                }
+    
     # Convert active_links to a list for the API
     links = []
     for hostname, link_info in active_links.items():
@@ -387,6 +461,9 @@ def get_active_links():
             'last_activity': link_info.get('last_activity', 'unknown'),
             'direction': link_info.get('direction', 'unknown')
         })
+    
+    # For debugging
+    app.logger.info(f"Returning links: {links}")
     
     return links
 
