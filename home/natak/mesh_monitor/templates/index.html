@@ -280,6 +280,25 @@
     </style>
 
     <script>
+        async function checkWifiStatus() {
+            try {
+                const response = await fetch('/wifi/status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateWifiButton(data.state);
+                }
+            } catch (error) {
+                console.error('Error checking WiFi status:', error);
+            }
+        }
+        
+        function updateWifiButton(state) {
+            const btn = document.getElementById('wifiToggle');
+            btn.textContent = state === 'up' ? 'Deactivate WiFi' : 'Activate WiFi';
+            btn.classList.toggle('off', state === 'down');
+        }
+        
         async function toggleWifi() {
             try {
                 const response = await fetch('/wifi/toggle', {
@@ -288,14 +307,15 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    const btn = document.getElementById('wifiToggle');
-                    btn.textContent = data.state === 'up' ? 'Deactivate WiFi' : 'Activate WiFi';
-                    btn.classList.toggle('off', data.state === 'down');
+                    updateWifiButton(data.state);
                 }
             } catch (error) {
                 console.error('Error toggling WiFi:', error);
             }
         }
+        
+        // Check WiFi status when page loads
+        document.addEventListener('DOMContentLoaded', checkWifiStatus);
     </script>
 
     <div class="content">
@@ -364,39 +384,7 @@
                 </div>
             `;
             
-            // Add Active Links section first
-            html += '<h3>Active Reticulum Links</h3>';
-            
-            if (activeLinks && activeLinks.length > 0) {
-                html += '<div class="node-cards">';
-                activeLinks.forEach(link => {
-                    const directionIcon = link.direction === 'incoming' ? '←' : '→';
-                    html += `
-                        <div class="reticulum-card link-card">
-                            <div class="info-item">
-                                <span class="label">Hostname:</span>
-                                <span class="value">${link.hostname} ${directionIcon}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Status:</span>
-                                <span class="value">${link.status}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Established:</span>
-                                <span class="value">${link.established_at}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Last Activity:</span>
-                                <span class="value">${link.last_activity}</span>
-                            </div>
-                        </div>`;
-                });
-                html += '</div>';
-            } else {
-                html += '<div class="reticulum-card"><div class="info-item">No active links</div></div>';
-            }
-            
-            // Then Wi-Fi Connections
+            // Wi-Fi Connections
             html += '<h3>Wi-Fi Connections</h3>';
             html += '<div class="node-cards">';
             nodes.forEach(node => {
@@ -438,6 +426,38 @@
                     </div>`;
             });
             html += '</div>';
+            
+            // Add Active Links section
+            html += '<h3>Active Reticulum Links</h3>';
+            
+            if (activeLinks && activeLinks.length > 0) {
+                html += '<div class="node-cards">';
+                activeLinks.forEach(link => {
+                    const directionIcon = link.direction === 'incoming' ? '←' : '→';
+                    html += `
+                        <div class="reticulum-card link-card">
+                            <div class="info-item">
+                                <span class="label">Hostname:</span>
+                                <span class="value">${link.hostname} ${directionIcon}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Status:</span>
+                                <span class="value">${link.status}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Established:</span>
+                                <span class="value">${link.established_at}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Last Activity:</span>
+                                <span class="value">${link.last_activity}</span>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="reticulum-card"><div class="info-item">No active links</div></div>';
+            }
             
             // Add Recent Link Events section
             html += '<h3>Recent Link Events</h3>';

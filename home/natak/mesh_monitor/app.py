@@ -88,6 +88,19 @@ def get_reticulum_status():
     rns_data = read_json_file(RNS_STATUS_PATH, 'rns_status')
     return rns_data.get('peers', {})
 
+@app.route('/wifi/status', methods=['GET'])
+def wifi_status_route():
+    try:
+        result = subprocess.run(['ip', 'link', 'show', 'wlan1'], capture_output=True, text=True)
+        is_up = 'state UP' in result.stdout
+        return jsonify({
+            'success': True,
+            'state': 'up' if is_up else 'down'
+        })
+    except Exception as e:
+        app.logger.error(f"Error getting WiFi status: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/wifi/toggle', methods=['POST'])
 def toggle_wifi():
     try:
