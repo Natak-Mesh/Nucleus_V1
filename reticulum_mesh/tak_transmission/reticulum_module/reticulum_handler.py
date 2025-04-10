@@ -434,11 +434,45 @@ class ReticulumHandler:
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")
 
+    def packet_delivered(self, receipt, hostname, packet_id):
+        """Callback when a packet has been delivered and proof received"""
+        try:
+            # Get the round-trip time
+            rtt = receipt.get_rtt()
+            self.logger.info(f"DELIVERY_CONFIRMED: Got proof from {hostname} for packet {packet_id} in {rtt:.2f}s")
+            
+            # Format for packet log display
+            self.logger.info(f"DELIVERY_CONFIRMED: #{packet_id} → {hostname} ({rtt:.2f}s)")
+        except Exception as e:
+            self.logger.error(f"Error in packet delivery callback: {e}")
+    
+    def packet_delivery_timeout(self, receipt, hostname, packet_id):
+        """Callback when a packet delivery times out"""
+        try:
+            self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {hostname}")
+        except Exception as e:
+            self.logger.error(f"Error in packet timeout callback: {e}")
+    
     def send_data_over_link(self, link, data, hostname, filename):
         """Send data over an established link"""
         try:
+            # Extract packet ID from filename if available
+            packet_id = "unknown"
+            if "_" in filename:
+                parts = filename.split("_")
+                if len(parts) > 1:
+                    packet_id = parts[1].split(".")[0]
+            
+            # Create and send packet
             packet = RNS.Packet(link, data)
-            packet.send()
+            receipt = packet.send()
+            
+            # Set callbacks to track delivery status
+            if receipt:
+                receipt.set_delivery_callback(lambda r: self.packet_delivered(r, hostname, packet_id))
+                receipt.set_timeout_callback(lambda r: self.packet_delivery_timeout(r, hostname, packet_id))
+                receipt.set_timeout(PACKET_TIMEOUT)  # Use the global timeout setting
+            
             self.logger.info(f"SENT: {filename} to {hostname} at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
             return True
         except Exception as e:
