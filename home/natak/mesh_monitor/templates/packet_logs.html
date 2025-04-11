@@ -245,7 +245,8 @@
                 log === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer' ||
                 log.includes('Reticulum Handler running') ||
                 log.includes('DELIVERY_CONFIRMED: Got proof from') ||
-                log.includes('SEND DETAILS:')) {
+                log.includes('SEND DETAILS:') ||
+                log.includes('LINK_DATA_RECEIVED')) {
                 return;
             }
 
@@ -437,6 +438,15 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
                                 `unknown (${sourceHash})` : sourceDisplay;
                         }
                         formattedLog = `INCOMING: #${packetId} from ${sourceDisplay} (${size} bytes)`;
+                        entry.classList.add('incoming');
+                    }
+                }
+                else if (cleanLog.includes('PACKET RECEIVED:')) {
+                    // Extract packet ID and hostname
+                    const match = cleanLog.match(/PACKET RECEIVED: #(\d+) from (\w+)/);
+                    if (match) {
+                        const [_, packetId, hostname] = match;
+                        formattedLog = `PACKET RECEIVED: #${packetId} from ${hostname}`;
                         entry.classList.add('incoming');
                     }
                 }

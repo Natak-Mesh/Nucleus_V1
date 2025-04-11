@@ -255,13 +255,21 @@ def resolve_unknown_hostnames(log_line, hash_to_hostname):
     if 'unknown' not in log_line:
         return log_line
         
-    # Look for source hash patterns in the log line
+    # Look for source hash patterns in the log line (standard format)
     source_hash_match = re.search(r'Source=unknown\(([^)]+)\)', log_line)
     if source_hash_match:
         source_hash = source_hash_match.group(1)
         if source_hash in hash_to_hostname:
             hostname = hash_to_hostname[source_hash]
             return log_line.replace(f'Source=unknown({source_hash})', f'Source={hostname}({source_hash})')
+    
+    # Look for PACKET RECEIVED format with unknown hostname and hash
+    packet_hash_match = re.search(r'PACKET RECEIVED: #\d+ from unknown\(([^)]+)\)', log_line)
+    if packet_hash_match:
+        source_hash = packet_hash_match.group(1)
+        if source_hash in hash_to_hostname:
+            hostname = hash_to_hostname[source_hash]
+            return log_line.replace(f'from unknown({source_hash})', f'from {hostname}({source_hash})')
     
     return log_line
 

@@ -21,9 +21,9 @@ PEER_TIMEOUT = 300      # 5 minutes
 STARTUP_DELAY = 10      # 10 seconds for LoRa radio
 LINK_TIMEOUT = 600      # 10 minutes link inactivity timeout
 
-# Retry Configuration
-PACKET_TIMEOUT = 20      # seconds to wait for delivery proof
-MAX_RETRIES = 3         # maximum number of retry attempts
+# Link keepalive interval (in seconds)
+# Default RNS.Link.KEEPALIVE is 360
+LINK_KEEPALIVE = 120    # 2 minutes - more frequent keepalives for better link maintenance
 
 class ReticulumHandler:
     def __init__(self):
@@ -90,6 +90,9 @@ class ReticulumHandler:
         self.peer_map = {}  # hostname -> destination
         self.last_seen = {} # hostname -> timestamp
         self.node_links = {}  # hostname -> link object
+        self.link_to_hostname = {}  # Direct link object to hostname mapping
+        self.hash_to_hostname = {}  # Hash to hostname mapping
+        self.identity_hash_to_hostname = {}  # Identity hash to hostname mapping  
         self.should_quit = False
         self.message_loops_running = False
         self.message_threads = []
@@ -136,6 +139,10 @@ class ReticulumHandler:
         # Start node mode monitoring thread
         self.monitor_thread = threading.Thread(target=self.monitor_node_modes, daemon=True)
         self.monitor_thread.start()
+        
+        # Start link monitoring thread
+        self.link_monitor_thread = threading.Thread(target=self.monitor_links, daemon=True)
+        self.link_monitor_thread.start()
         
         # Start establishing links to known nodes
         self.establish_all_links()
@@ -212,6 +219,69 @@ class ReticulumHandler:
             self.logger.error(f"Error reading identity_map.json: {e}")
             return None
 
+    def monitor_links(self):
+        """Periodically monitor link status and health"""
+        # Wait a bit before starting to monitor links
+        time.sleep(30)
+        
+        while not self.should_quit:
+            try:
+                # Check all active links
+                if self.node_links:
+                    self.logger.info("=== LINK STATUS REPORT ===")
+                    self.logger.info(f"Active Links: {len(self.node_links)}")
+                    
+                    for hostname, link in list(self.node_links.items()):
+                        try:
+                            # Check if link is active
+                            if hasattr(link, 'status'):
+                                status_str = "ACTIVE" if link.status == RNS.Link.ACTIVE else "NOT ACTIVE"
+                                
+                                # Collect link stats
+                                stats = []
+                                
+                                if hasattr(link, 'get_age'):
+                                    stats.append(f"Age: {link.get_age():.1f}s")
+                                
+                                if hasattr(link, 'inactive_for'):
+                                    stats.append(f"Inactive: {link.inactive_for():.1f}s")
+                                
+                                if hasattr(link, 'get_mtu'):
+                                    stats.append(f"MTU: {link.get_mtu()}")
+                                    
+                                if hasattr(link, 'get_expected_rate'):
+                                    stats.append(f"Rate: {link.get_expected_rate():.2f} bps")
+                                
+                                if hasattr(link, 'get_rssi') and link.get_rssi() is not None:
+                                    stats.append(f"RSSI: {link.get_rssi()} dBm")
+                                    
+                                if hasattr(link, 'get_snr') and link.get_snr() is not None:
+                                    stats.append(f"SNR: {link.get_snr()} dB")
+                                
+                                # Join stats with commas
+                                stats_str = ", ".join(stats)
+                                
+                                # Log link status
+                                self.logger.info(f"Link to {hostname}: {status_str} [{stats_str}]")
+                                
+                                # If link is not active but should be, try to re-establish
+                                if link.status != RNS.Link.ACTIVE and hostname in self.peer_map:
+                                    self.logger.warning(f"Link to {hostname} is not active, attempting to re-establish")
+                                    # Remove the old link
+                                    self.node_links.pop(hostname, None)
+                                    # Try to establish a new link
+                                    self.establish_link_to_node(hostname)
+                            else:
+                                self.logger.warning(f"Link to {hostname} has no status attribute")
+                        except Exception as e:
+                            self.logger.error(f"Error checking link to {hostname}: {e}")
+                
+                # Sleep between link status checks
+                time.sleep(60)  # Check every minute
+            except Exception as e:
+                self.logger.error(f"Error in link monitoring: {e}")
+                time.sleep(60)  # In case of error, still wait before trying again
+
     def establish_all_links(self):
         """Establish links to all known non-WiFi nodes"""
         self.logger.info("Establishing links to all known non-WiFi nodes")
@@ -227,6 +297,9 @@ class ReticulumHandler:
             if hostname in self.peer_map:
                 dest = self.peer_map[hostname]
                 
+                # Log that we're starting the link establishment
+                self.logger.info(f"Starting link establishment to node: {hostname}")
+                
                 # Create outgoing destination
                 outgoing_dest = RNS.Destination(
                     dest,
@@ -236,15 +309,23 @@ class ReticulumHandler:
                     ASPECT
                 )
                 
-                # Create link
-                link = RNS.Link(outgoing_dest)
-                link.set_link_established_callback(self.outgoing_link_established)
-                link.set_link_closed_callback(self.link_closed)
+                # Create link with keepalive settings
+                link = RNS.Link(
+                    outgoing_dest, 
+                    established_callback=self.outgoing_link_established,
+                    closed_callback=self.link_closed
+                )
                 
-                # Store link in our map
+                # Adjust the keepalive interval to maintain the link better
+                link.KEEPALIVE = LINK_KEEPALIVE
+                
+                # Enable physical layer statistics tracking if available
+                link.track_phy_stats(True)
+                
+                # Store link in our map - use a special marker to indicate "establishing"
                 self.node_links[hostname] = link
                 
-                self.logger.info(f"Establishing link to node: {hostname}")
+                self.logger.info(f"Link establishment process started for node: {hostname}")
                 return True
             else:
                 self.logger.warning(f"Cannot establish link to unknown peer: {hostname}")
@@ -264,6 +345,20 @@ class ReticulumHandler:
         
         if hostname:
             self.logger.info(f"LINK_ESTABLISHED: Outgoing link to {hostname}")
+            
+            # IMPORTANT: Store the link-to-hostname mapping right away
+            # This is critical for proper packet source identification
+            self.link_to_hostname[link] = hostname
+            
+            # Also store destination hash mapping if available
+            if hasattr(link, 'destination') and hasattr(link.destination, 'hash'):
+                source_hash = RNS.prettyhexrep(link.destination.hash) 
+                self.hash_to_hostname[source_hash] = hostname
+            
+            # Explicitly identify ourselves to the remote peer
+            self.logger.info(f"Identifying to remote peer {hostname}")
+            link.identify(self.identity)
+            
             self.check_pending_files_for_node(hostname)
         else:
             self.logger.warning("LINK_ESTABLISHED: Outgoing link to unknown node")
@@ -317,26 +412,107 @@ class ReticulumHandler:
         """Callback when an incoming link is established"""
         # Try to find hostname if possible
         hostname = "unknown"
+        source_hash = "unknown"
+        
+        # Check by destination hash
         if hasattr(link, 'destination') and hasattr(link.destination, 'hash'):
+            source_hash = RNS.prettyhexrep(link.destination.hash)
+            
+            # Now try to find hostname
             for h, dest in self.peer_map.items():
                 if hasattr(dest, 'hash') and dest.hash == link.destination.hash:
                     hostname = h
+                    # Store the mappings right away
+                    self.link_to_hostname[link] = hostname
+                    self.hash_to_hostname[source_hash] = hostname
                     break
-                    
-        self.logger.info(f"LINK_ESTABLISHED: Incoming link from {hostname}")
+        
+        # Log detailed link information
+        if hostname != "unknown":
+            self.logger.info(f"LINK_ESTABLISHED: Incoming link from {hostname} ({source_hash})")
+        else:
+            self.logger.info(f"LINK_ESTABLISHED: Incoming link from unknown peer ({source_hash})")
+            
         # Set callbacks for the link
         link.set_link_closed_callback(self.link_closed)
         link.set_packet_callback(self.link_packet_received)
+        
+        # Set callback for when remote peer identifies itself
+        link.set_remote_identified_callback(self.remote_peer_identified)
+
+    def remote_peer_identified(self, link, identity):
+        """Callback when a remote peer has identified itself on a link"""
+        try:
+            identity_hash = RNS.prettyhexrep(identity.hash)
+            self.logger.info(f"Remote peer identified with hash: {identity_hash}")
+            
+            # First try to find existing hostname for this identity
+            hostname = None
+            for h, dest in self.peer_map.items():
+                if dest == identity:
+                    hostname = h
+                    self.logger.info(f"Recognized peer identity for {h}")
+                    break
+            
+            # If hostname still unknown but we have destination hash, try that
+            if hostname is None and hasattr(link, 'destination') and hasattr(link.destination, 'hash'):
+                source_hash = RNS.prettyhexrep(link.destination.hash)
+                for h, dest in self.peer_map.items():
+                    if hasattr(dest, 'hash') and dest.hash == link.destination.hash:
+                        hostname = h
+                        self.logger.info(f"Matched peer by destination hash: {h}")
+                        break
+            
+            # If still unknown, use the hash as a temporary identifier
+            if hostname is None:
+                short_hash = identity_hash[:8]
+                hostname = f"node-{short_hash}"
+                self.logger.info(f"Assigning temporary hostname {hostname} to newly identified peer")
+            
+            # Update peer map with this identity
+            self.peer_map[hostname] = identity
+            self.last_seen[hostname] = time.time()
+            
+            # Store a mapping between the identity hash and hostname
+            if not hasattr(self, 'identity_hash_to_hostname'):
+                self.identity_hash_to_hostname = {}
+            self.identity_hash_to_hostname[identity_hash] = hostname
+            
+            # Also store a mapping between link and hostname
+            if not hasattr(self, 'link_to_hostname'):
+                self.link_to_hostname = {}
+            self.link_to_hostname[link] = hostname
+            
+            # And update any existing mapping from destination hash
+            if hasattr(link, 'destination') and hasattr(link.destination, 'hash'):
+                dest_hash = RNS.prettyhexrep(link.destination.hash)
+                if not hasattr(self, 'hash_to_hostname'):
+                    self.hash_to_hostname = {}
+                self.hash_to_hostname[dest_hash] = hostname
+            
+            self.logger.info(f"REMOTE_IDENTIFIED: Peer on link identified as {hostname}")
+                
+        except Exception as e:
+            self.logger.error(f"Error in remote peer identification: {e}")
 
     def link_closed(self, link):
         """Callback when a link is closed"""
         # Find the hostname associated with this link
         hostname = None
-        for h, l in self.node_links.items():
-            if l == link:
-                hostname = h
-                self.node_links.pop(h, None)
-                break
+        
+        # Check if we have it in our link mapping
+        if link in self.link_to_hostname:
+            hostname = self.link_to_hostname[link]
+            # Clean up the mapping
+            self.link_to_hostname.pop(link, None)
+        
+        # If not found in direct mapping, search node_links
+        if hostname is None:
+            for h, l in self.node_links.items():
+                if l == link:
+                    hostname = h
+                    self.node_links.pop(h, None)
+                    break
         
         # Get link age if available
         link_age = "unknown"
@@ -366,71 +542,120 @@ class ReticulumHandler:
     def link_packet_received(self, data, packet):
         """Handle a packet received over a link"""
         try:
-            # Try to find hostname for the source if possible
+            # Try to find the hostname using our various mappings
             hostname = "unknown"
             
-            # Check if this packet came from a known link
-            for h, link in self.node_links.items():
-                if link and hasattr(link, 'destination') and hasattr(link.destination, 'hash') and hasattr(packet, 'source_hash'):
-                    if link.destination.hash == packet.source_hash:
+            # First check for remote identity and lookup hostname
+            remote_id = packet.link.get_remote_identity()
+            if remote_id is not None:
+                # Try to find hostname in peer_map
+                for h, identity in self.peer_map.items():
+                    if identity == remote_id:
                         hostname = h
                         break
             
+            # If that fails, try using link mapping
+            if hostname == "unknown" and hasattr(self, 'link_to_hostname') and packet.link in self.link_to_hostname:
+                hostname = self.link_to_hostname[packet.link]
+                self.logger.debug(f"Found hostname {hostname} from link map")
+            
+            # If that fails, try using remote identity with hash mapping
+            if hostname == "unknown" and hasattr(packet.link, "get_remote_identity") and packet.link.get_remote_identity() is not None:
+                remote_identity = packet.link.get_remote_identity()
+                identity_hash = RNS.prettyhexrep(remote_identity.hash)
+                
+                # Check our identity hash map first (faster)
+                if hasattr(self, 'identity_hash_to_hostname') and identity_hash in self.identity_hash_to_hostname:
+                    hostname = self.identity_hash_to_hostname[identity_hash]
+                    self.logger.debug(f"Found hostname {hostname} from identity hash map")
+                else:
+                    # Fall back to searching peer_map
+                    for h, dest in self.peer_map.items():
+                        if dest == remote_identity:
+                            hostname = h
+                            # Update our mapping for future use
+                            if not hasattr(self, 'identity_hash_to_hostname'):
+                                self.identity_hash_to_hostname = {}
+                            self.identity_hash_to_hostname[identity_hash] = hostname
+                            self.logger.debug(f"Found hostname {hostname} from peer_map")
+                            break
+            
+            # Last resort: try source hash
+            if hostname == "unknown" and hasattr(packet, 'source_hash'):
+                source_hash = RNS.prettyhexrep(packet.source_hash)
+                
+                # Check our hash map first
+                if hasattr(self, 'hash_to_hostname') and source_hash in self.hash_to_hostname:
+                    hostname = self.hash_to_hostname[source_hash]
+                    self.logger.debug(f"Found hostname {hostname} from hash map")
+                else:
+                    # Fall back to searching node_links
+                    for h, link in self.node_links.items():
+                        if link and hasattr(link, 'destination') and hasattr(link.destination, 'hash'):
+                            if link.destination.hash == packet.source_hash:
+                                hostname = h
+                                # Store for future lookups
+                                if not hasattr(self, 'hash_to_hostname'):
+                                    self.hash_to_hostname = {}
+                                self.hash_to_hostname[source_hash] = hostname
+                                self.logger.debug(f"Found hostname {hostname} from node_links")
+                                break
+            
             # Get source information if available
             source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
+            data_size = len(data)
+            
+            # Update our link mapping if not already done
+            if hostname != "unknown" and hasattr(self, 'link_to_hostname') and packet.link not in self.link_to_hostname:
+                self.link_to_hostname[packet.link] = hostname
+            
+            # Log physical layer stats if available
+            phy_stats = ""
+            if hasattr(packet, "rssi") and packet.rssi is not None:
+                phy_stats += f" [RSSI {packet.rssi} dBm]"
+            if hasattr(packet, "snr") and packet.snr is not None:
+                phy_stats += f" [SNR {packet.snr} dB]"
+            
+            # Log packet quality if available
+            link_quality = ""
+            if hasattr(packet.link, "get_q") and packet.link.get_q() is not None:
+                link_quality = f" [Link Quality {packet.link.get_q():.2f}]"
+            
+            # Log link MTU if available
+            link_mtu = ""
+            if hasattr(packet.link, "get_mtu") and packet.link.get_mtu() is not None:
+                link_mtu = f" [Link MTU {packet.link.get_mtu()} bytes]"
             
             # Generate unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             filename = f"incoming_{timestamp}.zst"
             file_path = os.path.join(self.incoming_dir, filename)
             
-            # Get source information if available
-            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
-            data_size = len(data)
-            
-            self.logger.info(f"LINK_DATA_RECEIVED: Size={data_size} bytes, Source={hostname}({source_hash}), Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            self.logger.info(f"LINK_DATA_RECEIVED: Size={data_size} bytes, Source={hostname}({source_hash}), Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}{phy_stats}{link_quality}{link_mtu}")
             
             # Write data to file
             with open(file_path, 'wb') as f:
                 f.write(data)
-                
+            
+            # Extract packet ID from filename timestamp
+            packet_id = timestamp
+            
+            # Log with improved format that matches direct packet receipt
+            self.logger.info(f"PACKET RECEIVED: #{packet_id} from {hostname}")
             self.logger.info(f"SAVED: Message saved to {filename}")
             
-            # Check if we have a link to this hostname
+            # Check for pending files to send in response
+            # This helps with bidirectional communication and acknowledgments
             if hostname != "unknown" and hostname in self.node_links:
-                link = self.node_links[hostname]
+                # Use a small delay to allow the packet processing to complete before checking
+                # for pending messages, improves packet flow when messages are going both ways
+                def check_pending_delayed():
+                    time.sleep(0.1)
+                    self.check_pending_files_for_node(hostname)
                 
-                # Get list of .zst files in pending directory
-                pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
-                
-                if pending_files:
-                    self.logger.info(f"Found {len(pending_files)} files to process for {hostname}")
-                    
-                    # Sort by timestamp (assuming filename contains timestamp)
-                    pending_files.sort()
-                    
-                    for filename in pending_files:
-                        # Move file to processing directory
-                        pending_path = os.path.join(self.pending_dir, filename)
-                        processing_path = os.path.join(self.processing_dir, filename)
-                        
-                        # Atomic move
-                        os.rename(pending_path, processing_path)
-                        
-                        # Send file over link
-                        with open(processing_path, 'rb') as f:
-                            file_data = f.read()
-                            
-                            file_size = len(file_data)
-                            timestamp_from_filename = filename.split('_')[1].split('.')[0] if '_' in filename else 'unknown'
-                            
-                            self.logger.info(f"SEND DETAILS: File={filename}, Size={file_size} bytes, To={hostname}, TimestampFromFilename={timestamp_from_filename}")
-                            
-                            # Send packet over the established link
-                            self.send_data_over_link(link, file_data, hostname, filename)
-                            
-                        # Remove file from processing directory
-                        os.remove(processing_path)
+                # Start thread to check pending files
+                thread = threading.Thread(target=check_pending_delayed, daemon=True)
+                thread.start()
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")
 
@@ -449,13 +674,53 @@ class ReticulumHandler:
     def packet_delivery_timeout(self, receipt, hostname, packet_id):
         """Callback when a packet delivery times out"""
         try:
+            # Log the delivery failure
             self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {hostname}")
+            
+            # Check if the link is still active
+            link_active = False
+            link = None
+            
+            if hostname in self.node_links:
+                link = self.node_links[hostname]
+                if hasattr(link, 'status') and link.status == RNS.Link.ACTIVE:
+                    link_active = True
+            
+            # Log link status - this is important to diagnose if the automatic resend is working
+            if link_active:
+                # Get link information if available
+                link_info = ""
+                try:
+                    if hasattr(link, 'get_age'):
+                        link_info += f" [Age {link.get_age():.1f}s]"
+                    if hasattr(link, 'inactive_for'):
+                        link_info += f" [Inactive {link.inactive_for():.1f}s]"
+                    if hasattr(link, 'get_mtu'):
+                        link_info += f" [MTU {link.get_mtu()}]"
+                except Exception:
+                    pass
+                
+                self.logger.info(f"LINK_STATUS: Link to {hostname} is ACTIVE{link_info}, automatic resend should occur")
+            else:
+                self.logger.warning(f"LINK_STATUS: Link to {hostname} is NOT ACTIVE, automatic resend will not occur")
+                
+                # If we have a path to the destination but no active link, try to re-establish
+                if hostname in self.peer_map and hasattr(self.peer_map[hostname], 'hash'):
+                    dest_hash = self.peer_map[hostname].hash
+                    if RNS.Transport.has_path(dest_hash):
+                        self.logger.info(f"Path exists to {hostname}, attempting to re-establish link")
+                        self.establish_link_to_node(hostname)
         except Exception as e:
             self.logger.error(f"Error in packet timeout callback: {e}")
     
     def send_data_over_link(self, link, data, hostname, filename):
         """Send data over an established link"""
         try:
+            # Make sure the link is established before sending
+            if not hasattr(link, 'status') or link.status != RNS.Link.ACTIVE:
+                self.logger.warning(f"Cannot send data: Link to {hostname} is not active")
+                return False
+            
             # Extract packet ID from filename if available
             packet_id = "unknown"
             if "_" in filename:
@@ -463,18 +728,75 @@ class ReticulumHandler:
                 if len(parts) > 1:
                     packet_id = parts[1].split(".")[0]
             
-            # Create and send packet
+            # Simple hash for tracking, without using full content hash which causes errors
+            short_hash = str(hash(data) % 10000).zfill(4)
+            
+            # Get link statistics before sending
+            link_stats = ""
+            try:
+                if hasattr(link, 'get_mtu'):
+                    link_stats += f" [MTU {link.get_mtu()}]"
+                if hasattr(link, 'get_expected_rate'):
+                    link_stats += f" [Rate {link.get_expected_rate():.2f} bps]"
+                if hasattr(link, 'get_rssi') and link.get_rssi() is not None:
+                    link_stats += f" [RSSI {link.get_rssi()} dBm]"
+                if hasattr(link, 'get_snr') and link.get_snr() is not None:
+                    link_stats += f" [SNR {link.get_snr()} dB]"
+            except Exception:
+                pass
+            
+            # Create packet with data
             packet = RNS.Packet(link, data)
+            
+            # Initialize basic packet tracking
+            if not hasattr(self, 'packet_tracking'):
+                self.packet_tracking = {}
+                self.last_cleanup_time = time.time()
+            
+            # Simple tracking cleanup
+            current_time = time.time()
+            if current_time - self.last_cleanup_time > 60:  # Clean up every minute
+                self.last_cleanup_time = current_time
+                # Create a safe copy of keys for iteration
+                keys = list(self.packet_tracking.keys())
+                for key in keys:
+                    if key in self.packet_tracking and current_time - self.packet_tracking[key]['timestamp'] > 600:
+                        self.packet_tracking.pop(key, None)
+            
+            # Generate a unique key combining hostname and packet_id
+            tracking_key = f"{hostname}_{packet_id}"
+            
+            # Check if this might be a resend
+            if tracking_key in self.packet_tracking:
+                # We've seen this packet ID before, check if it's a resend
+                old_data_hash = self.packet_tracking[tracking_key]['data_hash']
+                if old_data_hash == short_hash:
+                    self.logger.info(f"DETECTED_RESEND: Packet {packet_id} to {hostname} [Hash: {short_hash}]")
+                else:
+                    self.logger.info(f"REUSED_ID: Packet {packet_id} to {hostname} has same ID but different content")
+            
+            # Store packet info for future reference
+            self.packet_tracking[tracking_key] = {
+                'data_hash': short_hash,
+                'timestamp': current_time,
+                'size': len(data)
+            }
+            
+            # Send packet and get receipt
+            self.logger.info(f"SENDING: {filename} to {hostname}{link_stats}")
             receipt = packet.send()
             
-            # Set callbacks to track delivery status
             if receipt:
+                # Set callbacks for packet delivery status tracking
                 receipt.set_delivery_callback(lambda r: self.packet_delivered(r, hostname, packet_id))
                 receipt.set_timeout_callback(lambda r: self.packet_delivery_timeout(r, hostname, packet_id))
-                receipt.set_timeout(PACKET_TIMEOUT)  # Use the global timeout setting
-            
-            self.logger.info(f"SENT: {filename} to {hostname} at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-            return True
+                
+                # Let Reticulum handle the timeout period automatically
+                self.logger.info(f"SENT: {filename} to {hostname} at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+                return True
+            else:
+                self.logger.warning(f"Failed to send packet: {filename} to {hostname}")
+                return False
         except Exception as e:
             self.logger.error(f"Error sending data over link: {e}")
             return False
@@ -578,17 +900,27 @@ class ReticulumHandler:
     def message_received(self, data, packet):
         """Handle incoming messages"""
         try:
-            # Try to find hostname for the source if possible
+            # Get source information and try to identify the source
             hostname = "unknown"
-            if hasattr(packet, 'source_hash'):
-                for h, dest in self.peer_map.items():
-                    if hasattr(dest, 'hash') and dest.hash == packet.source_hash:
-                        hostname = h
-                        break
+            source_hash = "unknown"
             
-            # Get source information if available
-            source_hash = RNS.prettyhexrep(packet.source_hash) if hasattr(packet, 'source_hash') else "unknown"
-            data_size = len(data)
+            if hasattr(packet, 'source_hash'):
+                source_hash = RNS.prettyhexrep(packet.source_hash)
+                
+                # Try our hash map first
+                if hasattr(self, 'hash_to_hostname') and source_hash in self.hash_to_hostname:
+                    hostname = self.hash_to_hostname[source_hash]
+                    self.logger.debug(f"Found hostname {hostname} from hash map")
+                else:
+                    # Fall back to searching peer_map
+                    for h, dest in self.peer_map.items():
+                        if hasattr(dest, 'hash') and dest.hash == packet.source_hash:
+                            hostname = h
+                            # Store for future lookups
+                            if not hasattr(self, 'hash_to_hostname'):
+                                self.hash_to_hostname = {}
+                            self.hash_to_hostname[source_hash] = hostname
+                            break
             
             # Generate unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -599,7 +931,11 @@ class ReticulumHandler:
             with open(file_path, 'wb') as f:
                 f.write(data)
             
-            self.logger.info(f"INCOMING: Size={data_size} bytes, Source={hostname}({source_hash}), Time={datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            # Extract packet ID from filename timestamp
+            packet_id = timestamp
+            
+            # Log with improved format
+            self.logger.info(f"PACKET RECEIVED: #{packet_id} from {hostname} ({source_hash})")
             self.logger.info(f"SAVED: Message saved to {filename}")
         except Exception as e:
             self.logger.error(f"Error processing incoming message: {e}")
@@ -621,7 +957,6 @@ class AnnounceHandler:
         self.parent = parent
         self.logger = logging.getLogger("AnnounceHandler")
         self.known_peers = set()  # We'll use this to track peers we've seen
-        self.hostname_identities = {}  # Track identities per hostname
 
     def received_announce(self, destination_hash, announced_identity, app_data):
         """Handle incoming announces from other nodes"""
@@ -635,11 +970,10 @@ class AnnounceHandler:
             if app_data:
                 hostname = app_data.decode() if isinstance(app_data, bytes) else str(app_data)
                 
-                # Check if the identity for this hostname has changed
+                # Check if the identity has changed from what we have stored
                 identity_changed = False
-                if hostname in self.hostname_identities:
-                    # Compare the identity public key to detect changes
-                    old_identity = self.hostname_identities[hostname]
+                if hostname in self.parent.peer_map:
+                    old_identity = self.parent.peer_map[hostname]
                     if old_identity.get_public_key() != announced_identity.get_public_key():
                         self.logger.info(f"Identity changed for {hostname}, treating as new peer")
                         identity_changed = True
@@ -651,9 +985,6 @@ class AnnounceHandler:
                             except Exception as e:
                                 self.logger.error(f"Error tearing down link: {e}")
                             self.parent.node_links.pop(hostname, None)
-                
-                # Store the identity for this hostname
-                self.hostname_identities[hostname] = announced_identity
                 
                 # Store destination and update last seen time
                 self.parent.peer_map[hostname] = announced_identity
