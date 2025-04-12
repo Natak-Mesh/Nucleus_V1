@@ -723,6 +723,15 @@ class ReticulumHandler:
     def packet_delivery_timeout(self, receipt, hostname, packet_id):
         """Callback when a packet delivery times out"""
         try:
+            # Check if this packet was already confirmed delivered
+            tracking_key = f"{hostname}_{packet_id}"
+            
+            with self.retry_lock:
+                # Skip timeout processing if the entry no longer exists in the queue
+                # (which would mean it was already confirmed delivered)
+                if tracking_key not in self.message_retry_queue:
+                    return
+            
             # Log the delivery failure
             self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {hostname}")
             
