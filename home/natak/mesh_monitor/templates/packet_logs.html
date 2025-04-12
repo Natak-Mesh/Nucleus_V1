@@ -548,9 +548,19 @@
                         entry.classList.add('failed');
                     }
                 }
-                else if (cleanLog.includes('RETRY_SENT:') || cleanLog.includes('RETRY_STATUS:') || 
-                         cleanLog.includes('RETRY_SCHEDULED:')) {
-                    const match = cleanLog.match(/Packet (\d+) to (\w+)/);
+                else if (cleanLog.includes('RETRY_SENT') || cleanLog.includes('RETRY_STATUS') || 
+                         cleanLog.includes('RETRY_SCHEDULED')) {
+                    console.log("Processing retry log:", cleanLog);
+                    // More flexible regex to match the format with RETRY_SENT: prefix
+                    let match = null;
+                    
+                    if (cleanLog.includes('RETRY_SENT:')) {
+                        match = cleanLog.match(/RETRY_SENT: Packet (\d+) to (\w+)/);
+                    } else {
+                        match = cleanLog.match(/Packet (\d+) to (\w+)(?:,|$)/);
+                    }
+                    
+                    console.log("Match result:", match);
                     const attemptMatch = cleanLog.match(/attempt (\d+) of (\d+)/i);
                     
                     if (match) {

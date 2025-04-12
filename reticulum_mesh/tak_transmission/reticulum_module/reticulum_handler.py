@@ -36,9 +36,9 @@ class ReticulumHandler:
         self.logger = logging.getLogger("ReticulumHandler")
         
         # Retry mechanism configuration
-        self.RETRY_INITIAL_DELAY = 60    # seconds (1 minute) - Base delay for first retry
+        self.RETRY_INITIAL_DELAY = 10    # seconds  - Base delay for first retry
         self.RETRY_BACKOFF_FACTOR = 2    # Multiplier for delay increase (doubles each time)
-        self.RETRY_MAX_DELAY = 900       # seconds (15 minutes) - Maximum allowed delay between retries
+        self.RETRY_MAX_DELAY = 120       # seconds (15 minutes) - Maximum allowed delay between retries
         self.RETRY_JITTER = 0.3          # +/- 30% randomness added to calculated delay
         self.RETRY_MAX_ATTEMPTS = 5      # Max number of retry attempts before giving up
         self.RETRY_RATE_LIMIT = 1        # Max number of retries per second
@@ -725,17 +725,20 @@ class ReticulumHandler:
         try:
             # Check if this packet was already confirmed delivered
             tracking_key = f"{hostname}_{packet_id}"
+            already_confirmed = False
             
             with self.retry_lock:
-                # Skip timeout processing if the entry no longer exists in the queue
-                # (which would mean it was already confirmed delivered)
+                # Check if entry no longer exists in the queue (already confirmed delivered)
                 if tracking_key not in self.message_retry_queue:
-                    return
+                    already_confirmed = True
+                    # Don't return early - we still want to check link status
             
-            # Log the delivery failure
-            self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {hostname}")
+            # Only log and handle retry logic if not already confirmed
+            if not already_confirmed:
+                # Log the delivery failure
+                self.logger.info(f"DELIVERY_FAILED: No proof received for packet {packet_id} to {hostname}")
             
-            # Check if the link is still active
+            # Check if the link is still active - this runs for ALL packets
             link_active = False
             link = None
             
@@ -744,8 +747,10 @@ class ReticulumHandler:
                 if hasattr(link, 'status') and link.status == RNS.Link.ACTIVE:
                     link_active = True
             
-            # Generate tracking key for this packet
-            tracking_key = f"{hostname}_{packet_id}"
+            # Only process retry logic if packet is still in the queue
+            if not already_confirmed:
+                # Generate tracking key for this packet
+                tracking_key = f"{hostname}_{packet_id}"
             
             # Check if we need to retry
             with self.retry_lock:
@@ -816,24 +821,28 @@ class ReticulumHandler:
                         entry['next_retry_time'] = None
                         self.logger.warning(f"RETRY_DEFERRED: Link to {hostname} is not active, retry for packet {packet_id} deferred")
             
-            # Log link status - this is important to diagnose if the automatic resend is working
-            if link_active:
-                # Get link information if available
-                link_info = ""
-                try:
-                    if hasattr(link, 'get_age'):
-                        link_info += f" [Age {link.get_age():.1f}s]"
-                    if hasattr(link, 'inactive_for'):
-                        link_info += f" [Inactive {link.inactive_for():.1f}s]"
-                    if hasattr(link, 'get_mtu'):
-                        link_info += f" [MTU {link.get_mtu()}]"
-                except Exception:
-                    pass
-                
-                self.logger.info(f"LINK_STATUS: Link to {hostname} is ACTIVE{link_info}, automatic resend should occur")
-            else:
-                self.logger.warning(f"LINK_STATUS: Link to {hostname} is NOT ACTIVE, automatic resend will not occur")
-                
+            # Log link status if not already confirmed
+            if not already_confirmed:
+                if link_active:
+                    # Get link information if available
+                    link_info = ""
+                    try:
+                        if hasattr(link, 'get_age'):
+                            link_info += f" [Age {link.get_age():.1f}s]"
+                        if hasattr(link, 'inactive_for'):
+                            link_info += f" [Inactive {link.inactive_for():.1f}s]"
+                        if hasattr(link, 'get_mtu'):
+                            link_info += f" [MTU {link.get_mtu()}]"
+                    except Exception:
+                        pass
+                    
+                    self.logger.info(f"LINK_STATUS: Link to {hostname} is ACTIVE{link_info}, automatic resend should occur")
+                else:
+                    self.logger.warning(f"LINK_STATUS: Link to {hostname} is NOT ACTIVE, automatic resend will not occur")
+            
+            # ALWAYS check if we need to re-establish the link, even for already confirmed packets
+            # This is critical for maintaining connectivity between nodes
+            if not link_active:
                 # If we have a path to the destination but no active link, try to re-establish
                 if hostname in self.peer_map and hasattr(self.peer_map[hostname], 'hash'):
                     dest_hash = self.peer_map[hostname].hash
