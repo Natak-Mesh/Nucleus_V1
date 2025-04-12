@@ -110,6 +110,7 @@ class ReticulumHandler:
         self.message_retry_queue = {}  # For tracking messages awaiting proof/retry
         self.retry_lock = threading.Lock()  # Thread safety for retry queue
         self.last_retry_time = 0  # For rate limiting retries
+        self.buffer_refs = {}  # Maps packet_id -> {count, nodes} for reference counting
         
         # Initialize Reticulum with startup delay
         self.logger.info(f"Initializing Reticulum (waiting {STARTUP_DELAY}s for LoRa radio)...")
@@ -685,23 +686,37 @@ class ReticulumHandler:
             
             # Clean up any retry entries for this packet
             tracking_key = f"{hostname}_{packet_id}"
+            buffer_path = None
+            
             with self.retry_lock:
+                # Get buffer path before removing from queue
                 if tracking_key in self.message_retry_queue:
-                    # Get the buffer path before removing from queue
                     buffer_path = self.message_retry_queue[tracking_key]['buffer_path']
-                    
                     # Remove from retry queue
                     self.message_retry_queue.pop(tracking_key, None)
                     
-                    # Delete buffer file if it exists
-                    if os.path.exists(buffer_path):
-                        try:
-                            os.remove(buffer_path)
-                            self.logger.debug(f"Removed buffer file for delivered packet: {packet_id}")
-                        except Exception as e:
-                            self.logger.error(f"Error removing buffer file: {e}")
+                # Update buffer reference count
+                if packet_id in self.buffer_refs:
+                    # Remove this node from the set
+                    self.buffer_refs[packet_id]['nodes'].discard(hostname)
+                    # Decrement count
+                    self.buffer_refs[packet_id]['count'] -= 1
                     
-                    self.logger.debug(f"Removed message {packet_id} from retry queue after delivery")
+                    # Only delete buffer file if no more references
+                    if self.buffer_refs[packet_id]['count'] <= 0:
+                        # All nodes have confirmed delivery, safe to delete
+                        if buffer_path and os.path.exists(buffer_path):
+                            try:
+                                os.remove(buffer_path)
+                                self.logger.debug(f"Removed buffer file for packet {packet_id} - all nodes confirmed delivery")
+                            except Exception as e:
+                                self.logger.error(f"Error removing buffer file: {e}")
+                        
+                        # Clean up reference tracking
+                        self.buffer_refs.pop(packet_id, None)
+                    else:
+                        nodes_left = len(self.buffer_refs[packet_id]['nodes'])
+                        self.logger.debug(f"Buffer file for packet {packet_id} still needed by {nodes_left} node(s)")
         except Exception as e:
             self.logger.error(f"Error in packet delivery callback: {e}")
     
@@ -741,13 +756,28 @@ class ReticulumHandler:
                         # Remove from retry queue
                         self.message_retry_queue.pop(tracking_key, None)
                         
-                        # Delete buffer file if it exists
-                        if os.path.exists(entry['buffer_path']):
-                            try:
-                                os.remove(entry['buffer_path'])
-                                self.logger.debug(f"Removed buffer file for failed packet: {packet_id}")
-                            except Exception as e:
-                                self.logger.error(f"Error removing buffer file: {e}")
+                        # Update buffer reference count
+                        if packet_id in self.buffer_refs:
+                            # Remove this node from the set
+                            self.buffer_refs[packet_id]['nodes'].discard(hostname)
+                            # Decrement count
+                            self.buffer_refs[packet_id]['count'] -= 1
+                            
+                            # Only delete buffer file if no more references
+                            if self.buffer_refs[packet_id]['count'] <= 0:
+                                # All nodes have either confirmed or exceeded max retries
+                                if os.path.exists(entry['buffer_path']):
+                                    try:
+                                        os.remove(entry['buffer_path'])
+                                        self.logger.debug(f"Removed buffer file for packet {packet_id} - all nodes completed")
+                                    except Exception as e:
+                                        self.logger.error(f"Error removing buffer file: {e}")
+                                
+                                # Clean up reference tracking
+                                self.buffer_refs.pop(packet_id, None)
+                            else:
+                                nodes_left = len(self.buffer_refs[packet_id]['nodes'])
+                                self.logger.debug(f"Buffer file for packet {packet_id} still needed by {nodes_left} node(s)")
                     
                     # Otherwise schedule retry
                     elif link_active:
@@ -893,6 +923,13 @@ class ReticulumHandler:
                 
                 # Add to message retry queue
                 with self.retry_lock:
+                    # Track the packet_id to hostname mapping for buffer reference counting
+                    if packet_id not in self.buffer_refs:
+                        self.buffer_refs[packet_id] = {'count': 0, 'nodes': set()}
+                    
+                    self.buffer_refs[packet_id]['count'] += 1
+                    self.buffer_refs[packet_id]['nodes'].add(hostname)
+                    
                     self.message_retry_queue[tracking_key] = {
                         'hostname': hostname,
                         'filename': filename,
@@ -989,10 +1026,22 @@ class ReticulumHandler:
                         if not os.path.exists(buffer_path):
                             self.logger.warning(f"RETRY_FILE_MISSING: Buffer file for packet {packet_id} to {hostname} not found")
                             
-                            # Remove from retry queue
+                            # Update buffer reference tracking and remove from retry queue
                             with self.retry_lock:
                                 if key in self.message_retry_queue:  # Check again in case it was removed
                                     self.message_retry_queue.pop(key, None)
+                                
+                                # Update buffer reference count
+                                if packet_id in self.buffer_refs:
+                                    # Remove this node from the set
+                                    self.buffer_refs[packet_id]['nodes'].discard(hostname)
+                                    # Decrement count
+                                    self.buffer_refs[packet_id]['count'] -= 1
+                                    
+                                    # If nothing else is using this buffer reference, clean it up
+                                    if self.buffer_refs[packet_id]['count'] <= 0:
+                                        self.buffer_refs.pop(packet_id, None)
+                                        self.logger.debug(f"Cleared buffer references for packet {packet_id} - no nodes remaining")
                             
                             continue
                         
