@@ -10,6 +10,7 @@ import logging
 import threading
 import random
 from datetime import datetime
+import shutil
 
 import RNS
 
@@ -33,6 +34,14 @@ class ReticulumHandler:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger("ReticulumHandler")
+        
+        # Retry mechanism configuration
+        self.RETRY_INITIAL_DELAY = 60    # seconds (1 minute) - Base delay for first retry
+        self.RETRY_BACKOFF_FACTOR = 2    # Multiplier for delay increase (doubles each time)
+        self.RETRY_MAX_DELAY = 900       # seconds (15 minutes) - Maximum allowed delay between retries
+        self.RETRY_JITTER = 0.3          # +/- 30% randomness added to calculated delay
+        self.RETRY_MAX_ATTEMPTS = 5      # Max number of retry attempts before giving up
+        self.RETRY_RATE_LIMIT = 1        # Max number of retries per second
         
         # Add file handler for packet logs
         log_dir = "/home/natak/reticulum_mesh/logs"
@@ -96,6 +105,11 @@ class ReticulumHandler:
         self.should_quit = False
         self.message_loops_running = False
         self.message_threads = []
+        
+        # Retry mechanism state
+        self.message_retry_queue = {}  # For tracking messages awaiting proof/retry
+        self.retry_lock = threading.Lock()  # Thread safety for retry queue
+        self.last_retry_time = 0  # For rate limiting retries
         
         # Initialize Reticulum with startup delay
         self.logger.info(f"Initializing Reticulum (waiting {STARTUP_DELAY}s for LoRa radio)...")
@@ -668,6 +682,26 @@ class ReticulumHandler:
             
             # Format for packet log display
             self.logger.info(f"DELIVERY_CONFIRMED: #{packet_id} → {hostname} ({rtt:.2f}s)")
+            
+            # Clean up any retry entries for this packet
+            tracking_key = f"{hostname}_{packet_id}"
+            with self.retry_lock:
+                if tracking_key in self.message_retry_queue:
+                    # Get the buffer path before removing from queue
+                    buffer_path = self.message_retry_queue[tracking_key]['buffer_path']
+                    
+                    # Remove from retry queue
+                    self.message_retry_queue.pop(tracking_key, None)
+                    
+                    # Delete buffer file if it exists
+                    if os.path.exists(buffer_path):
+                        try:
+                            os.remove(buffer_path)
+                            self.logger.debug(f"Removed buffer file for delivered packet: {packet_id}")
+                        except Exception as e:
+                            self.logger.error(f"Error removing buffer file: {e}")
+                    
+                    self.logger.debug(f"Removed message {packet_id} from retry queue after delivery")
         except Exception as e:
             self.logger.error(f"Error in packet delivery callback: {e}")
     
@@ -685,6 +719,63 @@ class ReticulumHandler:
                 link = self.node_links[hostname]
                 if hasattr(link, 'status') and link.status == RNS.Link.ACTIVE:
                     link_active = True
+            
+            # Generate tracking key for this packet
+            tracking_key = f"{hostname}_{packet_id}"
+            
+            # Check if we need to retry
+            with self.retry_lock:
+                if tracking_key in self.message_retry_queue:
+                    entry = self.message_retry_queue[tracking_key]
+                    
+                    # Increment retry attempts
+                    entry['retry_attempts'] += 1
+                    
+                    # Log retry status
+                    self.logger.info(f"RETRY_STATUS: Attempt {entry['retry_attempts']} of {self.RETRY_MAX_ATTEMPTS} for {packet_id} to {hostname}")
+                    
+                    # Check if max retries reached
+                    if entry['retry_attempts'] >= self.RETRY_MAX_ATTEMPTS:
+                        self.logger.warning(f"RETRY_MAX_EXCEEDED: Packet {packet_id} to {hostname} failed after {self.RETRY_MAX_ATTEMPTS} attempts")
+                        
+                        # Remove from retry queue
+                        self.message_retry_queue.pop(tracking_key, None)
+                        
+                        # Delete buffer file if it exists
+                        if os.path.exists(entry['buffer_path']):
+                            try:
+                                os.remove(entry['buffer_path'])
+                                self.logger.debug(f"Removed buffer file for failed packet: {packet_id}")
+                            except Exception as e:
+                                self.logger.error(f"Error removing buffer file: {e}")
+                    
+                    # Otherwise schedule retry
+                    elif link_active:
+                        # Calculate next retry time with exponential backoff
+                        delay = min(
+                            self.RETRY_INITIAL_DELAY * (self.RETRY_BACKOFF_FACTOR ** (entry['retry_attempts'] - 1)),
+                            self.RETRY_MAX_DELAY
+                        )
+                        # Add jitter
+                        jitter_factor = 1.0 + random.uniform(-self.RETRY_JITTER, self.RETRY_JITTER)
+                        delay = delay * jitter_factor
+                        
+                        entry['next_retry_time'] = time.time() + delay
+                        entry['status'] = 'pending_retry'
+                        
+                        self.logger.info(f"RETRY_SCHEDULED: Packet {packet_id} to {hostname} - Attempt {entry['retry_attempts']} of {self.RETRY_MAX_ATTEMPTS} scheduled in {delay:.1f}s")
+                        
+                        # Start retry thread if not already running
+                        if not hasattr(self, 'retry_thread') or not self.retry_thread.is_alive():
+                            self.retry_thread = threading.Thread(target=self.retry_processing_loop, daemon=True)
+                            self.retry_thread.start()
+                            self.logger.debug("Started retry processing thread")
+                    else:
+                        # Link is not active, mark as pending but without a retry time
+                        # We'll retry when the link becomes active again
+                        entry['status'] = 'pending_retry'
+                        entry['next_retry_time'] = None
+                        self.logger.warning(f"RETRY_DEFERRED: Link to {hostname} is not active, retry for packet {packet_id} deferred")
             
             # Log link status - this is important to diagnose if the automatic resend is working
             if link_active:
@@ -782,6 +873,15 @@ class ReticulumHandler:
                 'size': len(data)
             }
             
+            # Save a copy of the file to the buffer directory for potential retries
+            buffer_path = os.path.join(self.sent_buffer_dir, filename)
+            try:
+                with open(buffer_path, 'wb') as f:
+                    f.write(data)
+            except Exception as e:
+                self.logger.error(f"Error saving file to buffer: {e}")
+                # Continue anyway - we'll just not have retry capability for this packet
+            
             # Send packet and get receipt
             self.logger.info(f"SENDING: {filename} to {hostname}{link_stats}")
             receipt = packet.send()
@@ -791,16 +891,169 @@ class ReticulumHandler:
                 receipt.set_delivery_callback(lambda r: self.packet_delivered(r, hostname, packet_id))
                 receipt.set_timeout_callback(lambda r: self.packet_delivery_timeout(r, hostname, packet_id))
                 
+                # Add to message retry queue
+                with self.retry_lock:
+                    self.message_retry_queue[tracking_key] = {
+                        'hostname': hostname,
+                        'filename': filename,
+                        'buffer_path': buffer_path,
+                        'initial_send_time': time.time(),
+                        'retry_attempts': 0,
+                        'next_retry_time': None,  # None when awaiting proof
+                        'status': 'awaiting_proof',
+                        'receipt_hash': receipt.hash if hasattr(receipt, 'hash') else None
+                    }
+                
                 # Let Reticulum handle the timeout period automatically
                 self.logger.info(f"SENT: {filename} to {hostname} at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
                 return True
             else:
+                # If send failed, clean up buffer file
+                if os.path.exists(buffer_path):
+                    try:
+                        os.remove(buffer_path)
+                    except Exception as e:
+                        self.logger.error(f"Error removing buffer file after failed send: {e}")
+                
                 self.logger.warning(f"Failed to send packet: {filename} to {hostname}")
                 return False
         except Exception as e:
             self.logger.error(f"Error sending data over link: {e}")
             return False
 
+    def retry_processing_loop(self):
+        """Process messages in the retry queue"""
+        self.logger.info("Starting retry processing loop")
+        
+        # Keep running until there are no more pending retries
+        while not self.should_quit:
+            try:
+                retry_candidates = []
+                
+                # Find all packets due for retry
+                with self.retry_lock:
+                    current_time = time.time()
+                    
+                    # Check if there are any pending retries
+                    pending_retries = False
+                    for key, entry in self.message_retry_queue.items():
+                        if entry['status'] == 'pending_retry' and entry['next_retry_time'] is not None:
+                            pending_retries = True
+                            if entry['next_retry_time'] <= current_time:
+                                retry_candidates.append((key, entry))
+                
+                # If no pending retries at all, exit the loop
+                if not pending_retries:
+                    self.logger.debug("No pending retries, exiting retry processing loop")
+                    break
+                
+                # If no ready retries, sleep and check again
+                if not retry_candidates:
+                    time.sleep(1)
+                    continue
+                
+                # Sort by next_retry_time
+                retry_candidates.sort(key=lambda x: x[1]['next_retry_time'])
+                
+                # Process each candidate
+                for key, entry in retry_candidates:
+                    hostname = entry['hostname']
+                    filename = entry['filename']
+                    buffer_path = entry['buffer_path']
+                    
+                    # Check if we need to rate limit
+                    if time.time() - self.last_retry_time < (1.0 / self.RETRY_RATE_LIMIT):
+                        # Rate limiting in effect, sleep until we can send again
+                        sleep_time = (1.0 / self.RETRY_RATE_LIMIT) - (time.time() - self.last_retry_time)
+                        time.sleep(sleep_time)
+                    
+                    # Check if the link is active
+                    link_active = False
+                    link = None
+                    
+                    if hostname in self.node_links:
+                        link = self.node_links[hostname]
+                        if hasattr(link, 'status') and link.status == RNS.Link.ACTIVE:
+                            link_active = True
+                    
+                    # Only retry if the link is active
+                    if link_active:
+                        # Get packet ID from filename if available
+                        packet_id = "unknown"
+                        if "_" in filename:
+                            parts = filename.split("_")
+                            if len(parts) > 1:
+                                packet_id = parts[1].split(".")[0]
+                                
+                        # Check if the buffer file exists
+                        if not os.path.exists(buffer_path):
+                            self.logger.warning(f"RETRY_FILE_MISSING: Buffer file for packet {packet_id} to {hostname} not found")
+                            
+                            # Remove from retry queue
+                            with self.retry_lock:
+                                if key in self.message_retry_queue:  # Check again in case it was removed
+                                    self.message_retry_queue.pop(key, None)
+                            
+                            continue
+                        
+                        # Read the data from the buffer file
+                        try:
+                            with open(buffer_path, 'rb') as f:
+                                data = f.read()
+                                
+                            # Send the packet
+                            packet = RNS.Packet(link, data)
+                            receipt = packet.send()
+                            
+                            if receipt:
+                                # Update last retry time for rate limiting
+                                self.last_retry_time = time.time()
+                                
+                                # Set callbacks for packet delivery status tracking
+                                receipt.set_delivery_callback(lambda r: self.packet_delivered(r, hostname, packet_id))
+                                receipt.set_timeout_callback(lambda r: self.packet_delivery_timeout(r, hostname, packet_id))
+                                
+                                # Update the retry queue entry
+                                with self.retry_lock:
+                                    if key in self.message_retry_queue:  # Check again in case it was removed
+                                        self.message_retry_queue[key]['status'] = 'awaiting_proof'
+                                        self.message_retry_queue[key]['next_retry_time'] = None
+                                        self.message_retry_queue[key]['receipt_hash'] = receipt.hash if hasattr(receipt, 'hash') else None
+                                
+                                self.logger.info(f"RETRY_SENT: Packet {packet_id} to {hostname}, attempt {entry['retry_attempts']} of {self.RETRY_MAX_ATTEMPTS}")
+                            else:
+                                self.logger.warning(f"RETRY_FAILED: Failed to resend packet {packet_id} to {hostname}")
+                                
+                                # Link might be having issues, back off a bit
+                                with self.retry_lock:
+                                    if key in self.message_retry_queue:  # Check again in case it was removed
+                                        self.message_retry_queue[key]['next_retry_time'] = time.time() + 10  # Short delay before retrying
+                                        
+                        except Exception as e:
+                            self.logger.error(f"Error processing retry for packet {packet_id} to {hostname}: {e}")
+                            
+                            # Backoff on error
+                            with self.retry_lock:
+                                if key in self.message_retry_queue:  # Check again in case it was removed
+                                    self.message_retry_queue[key]['next_retry_time'] = time.time() + 30  # Longer delay on error
+                    else:
+                        # Link is not active, defer retry
+                        self.logger.debug(f"Deferring retry for packet to {hostname} - link not active")
+                        
+                        # Mark pending but without a time to check later when link is active
+                        with self.retry_lock:
+                            if key in self.message_retry_queue:  # Check again in case it was removed
+                                self.message_retry_queue[key]['next_retry_time'] = None
+                
+                # Sleep a bit before checking for more retries
+                time.sleep(1)
+                
+            except Exception as e:
+                self.logger.error(f"Error in retry processing loop: {e}")
+                time.sleep(5)  # Longer sleep on error
+        
+        self.logger.debug("Retry processing loop ended")
+    
     def start_message_loops(self):
         """Start outgoing and incoming message loops"""
         if self.message_loops_running:
