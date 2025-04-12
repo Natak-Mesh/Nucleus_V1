@@ -481,7 +481,8 @@
                     cleanLog.includes('TRACKING:') ||
                     cleanLog === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer' ||
                     cleanLog.includes('Reticulum Handler running') ||
-                    cleanLog.includes('SEND DETAILS:')) {
+                    cleanLog.includes('SEND DETAILS:') ||
+                    cleanLog.includes('SAVED:')) {
                     return;
                 }
                 
@@ -504,18 +505,16 @@
                 
                 // Process different log types
                 if (cleanLog.includes('SENDING:') || cleanLog.includes('SENT:')) {
+                    // Skip log entries with signal stats (RSSI and SNR)
+                    if (cleanLog.includes('RSSI') && cleanLog.includes('SNR')) {
+                        return; // Skip log entries with signal stats
+                    }
+                    
                     let match = cleanLog.match(/packet_(\d+)[\w\.]*? to (\w+)/);
                     if (match) {
                         icon = '→';
                         messageText = `SENT: #${match[1]} → ${match[2]}`;
                         entry.classList.add('sent');
-                        
-                        // Extract signal info if available
-                        let rssiMatch = cleanLog.match(/RSSI (-\d+) dBm/);
-                        let snrMatch = cleanLog.match(/SNR (\d+\.\d+) dB/);
-                        if (rssiMatch && snrMatch) {
-                            messageText += ` [${rssiMatch[1]} dBm / ${snrMatch[1]} dB]`;
-                        }
                     }
                 }
                 else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
@@ -594,6 +593,7 @@
                     }
                 }
                 else if (cleanLog.includes('LINK STATUS REPORT') || 
+                        cleanLog.includes('Active Links:') ||
                         (cleanLog.includes('Link to') && cleanLog.includes('ACTIVE'))) {
                     
                     const activeMatch = cleanLog.match(/Active Links: (\d+)/);
