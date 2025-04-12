@@ -15,6 +15,23 @@
             --warning-color: #ffa500;
             --incoming-color: #9c27b0; /* Purple color for incoming messages */
             --shadow-color: rgba(0,0,0,0.1);
+            
+            /* Message type colors */
+            --sent-color: #1976d2; /* Blue for sent messages */
+            --confirmed-color: #388e3c; /* Green for confirmations */
+            --retry-color: #f57c00; /* Orange for retries */
+            --link-established-color: #0288d1; /* Light blue for link established */
+            --link-closed-color: #fb8c00; /* Orange for link closed */
+            --link-active-color: #00acc1; /* Cyan for active links */
+            --link-data-color: #00bcd4; /* Cyan for link data */
+            --announce-color: #7b1fa2; /* Purple for announce handler */
+            --status-color: #5c6bc0; /* Indigo for status reports */
+            
+            /* Signal quality colors */
+            --signal-excellent: #43a047;
+            --signal-good: #7cb342;
+            --signal-fair: #ffb300;
+            --signal-poor: #f4511e;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -24,6 +41,14 @@
                 --text-primary: #ffffff;
                 --text-secondary: #cccccc;
                 --shadow-color: rgba(0,0,0,0.3);
+                
+                /* Adjust colors for dark mode */
+                --sent-color: #42a5f5; /* Lighter blue for dark mode */
+                --confirmed-color: #66bb6a; /* Lighter green for dark mode */
+                --retry-color: #ffa726; /* Lighter orange for dark mode */
+                --link-established-color: #29b6f6; /* Lighter blue for dark mode */
+                --link-closed-color: #ffb74d; /* Lighter orange for dark mode */
+                --status-color: #7986cb; /* Lighter indigo for dark mode */
             }
         }
 
@@ -48,6 +73,108 @@
             justify-content: space-between;
             align-items: center;
         }
+        
+        .filter-bar {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            background: var(--card-background);
+            padding: 10px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            z-index: 99;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            font-size: 13px;
+        }
+        
+        .filter-label {
+            margin-right: 8px;
+            font-weight: bold;
+        }
+        
+        .filter-button {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 16px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+            user-select: none;
+        }
+        
+        .filter-button.active {
+            color: white;
+        }
+        
+        .filter-button:hover {
+            transform: translateY(-1px);
+        }
+        
+        .filter-button .icon {
+            margin-right: 5px;
+            font-size: 14px;
+        }
+        
+        .filter-button.sent.active {
+            background-color: var(--sent-color);
+        }
+        
+        .filter-button.confirmed.active {
+            background-color: var(--confirmed-color);
+        }
+        
+        .filter-button.failed.active {
+            background-color: var(--danger-color);
+        }
+        
+        .filter-button.retry.active {
+            background-color: var(--retry-color);
+        }
+        
+        .filter-button.incoming.active {
+            background-color: var(--incoming-color);
+        }
+        
+        .filter-button.link-established.active {
+            background-color: var(--link-established-color);
+        }
+        
+        .filter-button.link-closed.active {
+            background-color: var(--link-closed-color);
+        }
+        
+        .filter-button.status-report.active {
+            background-color: var(--status-color);
+        }
+        
+        .filter-button.announce.active {
+            background-color: var(--announce-color);
+        }
+        
+        .filter-actions {
+            margin-left: auto;
+        }
+        
+        .filter-action-button {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .filter-action-button:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
 
         .connection-indicator {
             width: 10px;
@@ -66,12 +193,12 @@
         }
 
         .content {
-            margin-top: 56px;
+            margin-top: 112px; /* Adjusted to account for filter bar */
             padding: 16px;
             font-size: 14px;
             line-height: 1.5;
             position: relative;
-            height: calc(100vh - 88px);  /* Full height minus margins */
+            height: calc(100vh - 144px);  /* Full height minus margins (adjusted for filter bar) */
             overflow: hidden;  /* Prevent content overflow */
         }
 
@@ -118,47 +245,101 @@
         }
 
         .log-entry {
-            margin: 4px 0;
-            padding: 4px 8px;
-            border-radius: 4px;
+            margin: 6px 0;
+            padding: 6px 10px;
+            border-radius: 6px;
             white-space: pre-wrap;
             word-wrap: break-word;
+            display: flex;
+            align-items: center;
+            font-family: monospace;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-left: 3px solid transparent;
         }
 
         .log-entry.sent {
-            color: var(--primary-color);
+            color: var(--sent-color);
+            border-left-color: var(--sent-color);
         }
 
         .log-entry.confirmed {
-            color: var(--success-color);
+            color: var(--confirmed-color);
+            border-left-color: var(--confirmed-color);
         }
 
         .log-entry.failed {
             color: var(--danger-color);
+            border-left-color: var(--danger-color);
         }
 
         .log-entry.retry {
-            color: var(--warning-color);
+            color: var(--retry-color);
+            border-left-color: var(--retry-color);
         }
 
         .log-entry.incoming {
             color: var(--incoming-color);
+            border-left-color: var(--incoming-color);
         }
         
         .log-entry.link-established {
-            color: #2196F3; /* Blue */
+            color: var(--link-established-color);
+            border-left-color: var(--link-established-color);
         }
         
         .log-entry.link-closed {
-            color: #FF9800; /* Orange */
+            color: var(--link-closed-color);
+            border-left-color: var(--link-closed-color);
         }
         
         .log-entry.link-data-sent {
-            color: #00BCD4; /* Cyan */
+            color: var(--link-data-color);
+            border-left-color: var(--link-data-color);
         }
         
         .log-entry.link-data-received {
-            color: #9C27B0; /* Purple */
+            color: var(--link-data-color);
+            border-left-color: var(--link-data-color);
+        }
+        
+        .log-entry.status-report {
+            color: var(--status-color);
+            border-left-color: var(--status-color);
+            font-weight: 500;
+        }
+        
+        .log-entry.announce {
+            color: var(--announce-color);
+            border-left-color: var(--announce-color);
+        }
+        
+        /* Message icon styles */
+        .message-icon {
+            display: inline-block;
+            width: 22px;
+            text-align: center;
+            margin-right: 8px;
+            font-size: 14px;
+        }
+        
+        /* Time indicator */
+        .time-indicator {
+            opacity: 0.7;
+            font-size: 11px;
+            min-width: 65px;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        
+        /* RTT time display */
+        .rtt-time {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, 0.05);
+            font-size: 12px;
+            font-weight: 500;
         }
 
         a {
@@ -182,6 +363,41 @@
         </div>
     </div>
 
+    <div class="filter-bar">
+        <span class="filter-label">Show:</span>
+        <div class="filter-button sent active" data-type="sent">
+            <span class="icon">→</span>Sent
+        </div>
+        <div class="filter-button incoming active" data-type="incoming">
+            <span class="icon">←</span>Received
+        </div>
+        <div class="filter-button confirmed active" data-type="confirmed">
+            <span class="icon">✓</span>Confirmed
+        </div>
+        <div class="filter-button failed active" data-type="failed">
+            <span class="icon">❌</span>Failed
+        </div>
+        <div class="filter-button retry active" data-type="retry">
+            <span class="icon">🔄</span>Retry
+        </div>
+        <div class="filter-button link-established active" data-type="link-established">
+            <span class="icon">🔗</span>Link Est.
+        </div>
+        <div class="filter-button link-closed active" data-type="link-closed">
+            <span class="icon">✂️</span>Link Closed
+        </div>
+        <div class="filter-button status-report active" data-type="status-report">
+            <span class="icon">📊</span>Status
+        </div>
+        <div class="filter-button announce active" data-type="announce">
+            <span class="icon">👤</span>Announce
+        </div>
+        <div class="filter-actions">
+            <button class="filter-action-button" id="selectAllFilters">Select All</button>
+            <button class="filter-action-button" id="clearAllFilters">Clear All</button>
+        </div>
+    </div>
+
     <div class="content">
         <div id="logContent"></div>
     </div>
@@ -193,7 +409,7 @@
 
     <script>
         let eventSource = null;
-        const MAX_RETRIES = 3;  // Match the value from reticulum_handler.py
+        const MAX_RETRIES = 5;  // Match the value from reticulum_handler.py
 
         function connectEventSource() {
             if (eventSource) {
@@ -222,7 +438,6 @@
 
         let isPaused = false;
         let lastLogs = [];
-
         let userHasScrolled = false;
 
         function displayLogs(logs) {
@@ -234,27 +449,14 @@
             
             const logContent = document.getElementById('logContent');
             
-            // Clear existing content and display new logs
+            // Clear existing content
             logContent.innerHTML = '';
             
+            // Get active filters
+            const activeFilters = Array.from(document.querySelectorAll('.filter-button.active'))
+                .map(button => button.getAttribute('data-type'));
+            
             logs.forEach(log => {
-            // Skip non-essential log lines
-            if (log.includes('AnnounceHandler') || 
-                log.includes('Sending packet') || 
-                log.includes('TRACKING:') ||
-                log === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer' ||
-                log.includes('Reticulum Handler running') ||
-                log.includes('DELIVERY_CONFIRMED: Got proof from') ||
-                log.includes('SEND DETAILS:') ||
-                log.includes('LINK_DATA_RECEIVED')) {
-                return;
-            }
-
-                const entry = document.createElement('div');
-                entry.className = 'log-entry';
-                
-                let formattedLog = log;
-                
                 // Extract timestamp prefix if present
                 let cleanLog = log;
                 let timestamp = "";
@@ -273,316 +475,206 @@
                     }
                 }
                 
-                // Format timestamp for display (extract just time portion for cleaner display)
-                let displayTime = "";
-                if (timestamp) {
-                    const timeOnlyMatch = timestamp.match(/\d{2}:\d{2}:\d{2}/);
-                    if (timeOnlyMatch) {
-                        displayTime = timeOnlyMatch[0] + " ";
-                    } else {
-                        displayTime = timestamp + " ";
-                    }
+                // Skip non-essential log lines
+                if (cleanLog.includes('AnnounceHandler') || 
+                    cleanLog.includes('Sending packet') || 
+                    cleanLog.includes('TRACKING:') ||
+                    cleanLog === 'DELIVERY_CONFIRMED: Successfully delivered, removed from sent_buffer' ||
+                    cleanLog.includes('Reticulum Handler running') ||
+                    cleanLog.includes('SEND DETAILS:')) {
+                    return;
                 }
                 
-                // Extract packet info
-                if (cleanLog.includes('SENT:')) {
-                    // Handle regular SENT messages
-                    let match = cleanLog.match(/packet_(\d+)\.zst to (\w+)/);
-                    
-                    // Handle retry SENT messages
-                    if (!match) {
-                        match = cleanLog.match(/packet_(\d+)_retry\d+_to_\w+\.zst to (\w+)/);
-                    }
-                    
+                // Create log entry
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                
+                // Create time element
+                const timeElement = document.createElement('span');
+                timeElement.className = 'time-indicator';
+                if (timestamp) {
+                    const timeOnlyMatch = timestamp.match(/\d{2}:\d{2}:\d{2}/);
+                    timeElement.textContent = timeOnlyMatch ? timeOnlyMatch[0] : timestamp;
+                }
+                
+                // Create message element
+                const messageElement = document.createElement('span');
+                let messageText = '';
+                let icon = '';
+                
+                // Process different log types
+                if (cleanLog.includes('SENDING:') || cleanLog.includes('SENT:')) {
+                    let match = cleanLog.match(/packet_(\d+)[\w\.]*? to (\w+)/);
                     if (match) {
-                        formattedLog = `SENT: #${match[1]} → ${match[2]}`;
+                        icon = '→';
+                        messageText = `SENT: #${match[1]} → ${match[2]}`;
                         entry.classList.add('sent');
-                    }
-                }
-else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
-    if (cleanLog.includes('Successfully delivered')) {
-        // Handle regular delivery confirmations
-        let match = cleanLog.match(/Successfully delivered packet_(\d+)_to_(\w+)\.zst/);
-        
-        // Handle retry delivery confirmations
-        if (!match) {
-            match = cleanLog.match(/Successfully delivered packet_(\d+)_retry\d+_to_(\w+)(?:_to_\w+)?\.zst/);
-        }
-        
-        if (match) {
-            const [_, packetId, fullNode] = match;
-            
-            // Extract just the base node name (before any _to_ suffix)
-            let node = fullNode;
-            if (fullNode.includes('_to_')) {
-                node = fullNode.split('_to_')[0];
-            }
-            
-            // Try to find RTT time from previous "Got proof from" log entry
-            let rttTime = null;
-            for (let i = logs.indexOf(log) - 1; i >= 0 && i >= logs.indexOf(log) - 5; i--) {
-                const prevLog = logs[i];
-                if (prevLog.includes('Got proof from') && 
-                    (prevLog.includes(node) || prevLog.includes(fullNode))) {
-                    const timeMatch = prevLog.match(/in (\d+\.\d+)s/);
-                    if (timeMatch) {
-                        rttTime = timeMatch[1];
-                        break;
-                    }
-                }
-            }
-            
-            const timeInfo = rttTime ? ` (${rttTime}s)` : '';
-            formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node}${timeInfo}`;
-            entry.classList.add('confirmed');
-        }
-    } else if (cleanLog.includes('Got proof from')) {
-        // Handle the first DELIVERY_CONFIRMED message format
-        const match = cleanLog.match(/Got proof from (\w+) for packet .*<([^>]+)>.* in (\d+\.\d+)s/);
-        if (match) {
-            const [_, node, packetHash, time] = match;
-            
-            // Try to find the packet ID from previous SENT messages
-            let packetId = "";
-            for (let i = logs.indexOf(log) - 1; i >= 0 && i >= logs.indexOf(log) - 10; i--) {
-                const prevLog = logs[i];
-                if (prevLog.includes(packetHash) && prevLog.includes('SENT:')) {
-                    const idMatch = prevLog.match(/packet_(\d+)/);
-                    if (idMatch) {
-                        packetId = idMatch[1];
-                        break;
-                    }
-                }
-            }
-            
-            if (packetId) {
-                formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node} (${time}s)`;
-            } else {
-                formattedLog = `DELIVERY_CONFIRMED: Proof from ${node} (${time}s)`;
-            }
-            entry.classList.add('confirmed');
-        }
-    } else {
-        // Handle the format seen in the logs: DELIVERY_CONFIRMED: #1743888045269 → takNode2_to_takNode2
-        const match = cleanLog.match(/DELIVERY_CONFIRMED: #(\d+) → (\w+)/);
-        if (match) {
-            const [_, packetId, fullNode] = match;
-            
-            // Extract just the base node name (before any _to_ suffix)
-            let node = fullNode;
-            if (fullNode.includes('_to_')) {
-                node = fullNode.split('_to_')[0];
-            }
-            
-            // Try to extract RTT time if available
-            let timeMatch = cleanLog.match(/in (\d+\.\d+)s/);
-            
-            // Try to find RTT time from previous "Got proof from" log entry if not in this log
-            if (!timeMatch) {
-                for (let i = logs.indexOf(log) - 1; i >= 0 && i >= logs.indexOf(log) - 5; i--) {
-                    const prevLog = logs[i];
-                    if (prevLog.includes('Got proof from') && 
-                        (prevLog.includes(node) || prevLog.includes(fullNode))) {
-                        const prevTimeMatch = prevLog.match(/in (\d+\.\d+)s/);
-                        if (prevTimeMatch) {
-                            timeMatch = prevTimeMatch;
-                            break;
+                        
+                        // Extract signal info if available
+                        let rssiMatch = cleanLog.match(/RSSI (-\d+) dBm/);
+                        let snrMatch = cleanLog.match(/SNR (\d+\.\d+) dB/);
+                        if (rssiMatch && snrMatch) {
+                            messageText += ` [${rssiMatch[1]} dBm / ${snrMatch[1]} dB]`;
                         }
                     }
                 }
-            }
-            
-            const timeInfo = timeMatch ? ` (${timeMatch[1]}s)` : '';
-            formattedLog = `DELIVERY_CONFIRMED: #${packetId} → ${node}${timeInfo}`;
-            entry.classList.add('confirmed');
-        }
-    }
-}
-                else if (cleanLog.includes('INCOMING:')) {
-                    // Extract just the size and source, ignoring timestamp and Time field
-                    const sizeMatch = cleanLog.match(/Size=(\d+) bytes/);
-                    
-                    // Extract source with hash pattern
-                    let sourceMatch = cleanLog.match(/Source=([^(]+)\(([^)]+)\)/);
-                    let source = "unknown";
-                    let sourceHash = "";
-                    
-                    if (sourceMatch) {
-                        source = sourceMatch[1];
-                        sourceHash = sourceMatch[2];
-                    } else {
-                        // Fallback to simple source extraction
-                        let simpleSourceMatch = cleanLog.match(/Source=([^,]+)/);
-                        source = simpleSourceMatch ? simpleSourceMatch[1] : "unknown";
+                else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
+                    let match = cleanLog.match(/DELIVERY_CONFIRMED: #(\d+) → (\w+)(?: \((\d+\.\d+)s\))?/);
+                    if (match) {
+                        const [_, packetId, node, time] = match;
+                        icon = '✓';
+                        messageText = `CONFIRMED: #${packetId} → ${node}${time ? ' ('+time+'s)' : ''}`;
+                        entry.classList.add('confirmed');
                     }
-                    
-                    // Try to extract packet ID from filename or generate one from timestamp
-                    let packetId = "unknown";
-                    const packetMatch = cleanLog.match(/incoming_(\d+)\.zst/);
-                    if (packetMatch) {
-                        packetId = packetMatch[1];
-                    } else {
-                        // Extract timestamp as fallback ID
-                        const timeMatch = cleanLog.match(/Time=(\d{2}:\d{2}:\d{2}\.\d{3})/);
-                        if (timeMatch) {
-                            packetId = timeMatch[1].replace(/[:.]/g, '');
-                        }
-                    }
-                    
-                    if (sizeMatch) {
-                        const size = sizeMatch[1];
-                        let sourceDisplay = source.trim();
-                        if (sourceHash) {
-                            // Only show hash if source is still unknown
-                            sourceDisplay = sourceDisplay === "unknown" ? 
-                                `unknown (${sourceHash})` : sourceDisplay;
-                        }
-                        formattedLog = `INCOMING: #${packetId} from ${sourceDisplay} (${size} bytes)`;
-                        entry.classList.add('incoming');
+                    else if (cleanLog.includes('Got proof from')) {
+                        // Skip detailed proof logs
+                        return;
                     }
                 }
                 else if (cleanLog.includes('PACKET RECEIVED:')) {
-                    // Extract packet ID and hostname
-                    const match = cleanLog.match(/PACKET RECEIVED: #(\d+) from (\w+)/);
+                    let match = cleanLog.match(/PACKET RECEIVED: #(\d+) from (\w+)/);
                     if (match) {
-                        const [_, packetId, hostname] = match;
-                        formattedLog = `PACKET RECEIVED: #${packetId} from ${hostname}`;
+                        const [_, packetId, source] = match;
+                        icon = '←';
+                        messageText = `RECEIVED: #${packetId} from ${source}`;
                         entry.classList.add('incoming');
                     }
                 }
                 else if (cleanLog.includes('DELIVERY_FAILED:')) {
-                    // Extract packet ID and node from the new format
-                    const newFormatMatch = cleanLog.match(/No proof received for packet (\d+) to (\w+)/);
-                    if (newFormatMatch) {
-                        const packetId = newFormatMatch[1];
-                        const node = newFormatMatch[2];
-                        formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
-                    } else {
-                        // Fallback to old format or unknown
-                        let packetId = "unknown";
-                        let node = "unknown";
-                        
-                        // Try to find packet ID in filename
-                        const packetMatch = cleanLog.match(/packet_(\d+)_to_(\w+)\.zst/);
-                        if (packetMatch) {
-                            packetId = packetMatch[1];
-                            node = packetMatch[2];
-                        }
-                        
-                        // Try to match the format we added in reticulum_handler.py
-                        const unknownMatch = cleanLog.match(/packet (\w+) to (\w+) \(hash:/);
-                        if (unknownMatch) {
-                            packetId = unknownMatch[1];
-                            node = unknownMatch[2];
-                        }
-                        
-                        formattedLog = `DELIVERY_FAILED: #${packetId} → ${node}`;
-                    }
-                    entry.classList.add('failed');
-                }
-                else if (cleanLog.includes('RETRY_ATTEMPT:')) {
-                    const match = cleanLog.match(/Moving .* to packet_(\d+)_retry(\d+)_to_(\w+)\.zst/);
+                    const match = cleanLog.match(/packet (\d+) to (\w+)/);
                     if (match) {
-                        const [_, packetId, retryCount, node] = match;
-                        formattedLog = `RETRY: #${packetId} → ${node} (try ${retryCount}/${MAX_RETRIES})`;
+                        const [_, packetId, node] = match;
+                        icon = '❌';
+                        messageText = `FAILED: #${packetId} → ${node}`;
+                        entry.classList.add('failed');
+                    }
+                }
+                else if (cleanLog.includes('RETRY_SENT:') || cleanLog.includes('RETRY_STATUS:') || 
+                         cleanLog.includes('RETRY_SCHEDULED:')) {
+                    const match = cleanLog.match(/Packet (\d+) to (\w+)/);
+                    const attemptMatch = cleanLog.match(/attempt (\d+) of (\d+)/i);
+                    
+                    if (match) {
+                        const [_, packetId, node] = match;
+                        let attemptInfo = '';
+                        
+                        if (attemptMatch) {
+                            const [__, attempt, maxAttempts] = attemptMatch;
+                            attemptInfo = ` (try ${attempt}/${maxAttempts})`;
+                        }
+                        
+                        icon = '🔄';
+                        messageText = `RETRY: #${packetId} → ${node}${attemptInfo}`;
                         entry.classList.add('retry');
                     }
                 }
                 else if (cleanLog.includes('LINK_ESTABLISHED:')) {
-                    // Extract link details
-                    let direction = cleanLog.includes('Outgoing') ? 'Outgoing' : 'Incoming';
-                    let nodeMatch = cleanLog.match(/(Outgoing|Incoming) link (to|from) ([^ ]+)/);
-                    let node = nodeMatch ? nodeMatch[3] : "unknown";
+                    const direction = cleanLog.includes('Outgoing') ? 'Outgoing' : 'Incoming';
+                    const nodeMatch = cleanLog.match(/(Outgoing|Incoming) link (to|from) ([^ ]+)/);
                     
-                    // Extract link ID
-                    let linkIdMatch = cleanLog.match(/ID: ([^,)]+)/);
-                    let linkId = linkIdMatch ? linkIdMatch[1] : "unknown";
-                    
-                    // Extract hop count if available
-                    let hopsMatch = cleanLog.match(/Hops: ([^,)]+)/);
-                    let hops = hopsMatch ? hopsMatch[1] : "";
-                    let hopsInfo = hops && hops !== "unknown" ? ` (${hops} hops)` : "";
-                    
-                    // Extract signal metrics if available
-                    let metricsMatch = cleanLog.match(/\[(.*?)\]/);
-                    let metrics = metricsMatch ? ` [${metricsMatch[1]}]` : "";
-                    
-                    formattedLog = `LINK ${direction.toUpperCase()}: ${node} (${linkId})${hopsInfo}${metrics}`;
-                    entry.classList.add('link-established');
+                    if (nodeMatch) {
+                        const [_, _direction, _preposition, node] = nodeMatch;
+                        
+                        icon = direction === 'Outgoing' ? '→🔗' : '🔗←';
+                        messageText = `LINK ${direction.toUpperCase()}: ${node}`;
+                        entry.classList.add('link-established');
+                    }
                 }
                 else if (cleanLog.includes('LINK_CLOSED:')) {
-                    // Extract node and link ID
-                    let nodeMatch = cleanLog.match(/Link with ([^ ]+) closed/);
-                    let node = nodeMatch ? nodeMatch[1] : "unknown";
+                    const nodeMatch = cleanLog.match(/Link with ([^ ]+) closed/);
+                    const ageMatch = cleanLog.match(/Age: ([^,)]+)/);
                     
-                    // Extract link ID
-                    let linkIdMatch = cleanLog.match(/ID: ([^,)]+)/);
-                    let linkId = linkIdMatch ? linkIdMatch[1] : "unknown";
-                    
-                    // Extract reason and age
-                    let reasonMatch = cleanLog.match(/Reason: ([^,)]+)/);
-                    let reason = reasonMatch ? reasonMatch[1] : "unknown";
-                    
-                    let ageMatch = cleanLog.match(/Age: ([^,)]+)/);
-                    let age = ageMatch ? ageMatch[1] : "unknown";
-                    
-                    formattedLog = `LINK CLOSED: ${node} (${linkId}) - ${reason} after ${age}`;
-                    entry.classList.add('link-closed');
-                }
-                else if (cleanLog.includes('LINK_DATA_SENT:')) {
-                    // Extract filename and node
-                    let filenameMatch = cleanLog.match(/LINK_DATA_SENT: ([^ ]+) to ([^ ]+)/);
-                    let filename = filenameMatch ? filenameMatch[1] : "unknown";
-                    let node = filenameMatch ? filenameMatch[2] : "unknown";
-                    
-                    // Extract link ID
-                    let linkIdMatch = cleanLog.match(/Link: ([^)]+)/);
-                    let linkId = linkIdMatch ? linkIdMatch[1] : "unknown";
-                    
-                    // Extract signal metrics if available
-                    let metricsMatch = cleanLog.match(/\[(.*?)\]/);
-                    let metrics = metricsMatch ? ` [${metricsMatch[1]}]` : "";
-                    
-                    formattedLog = `LINK DATA SENT: ${filename} → ${node} (${linkId})${metrics}`;
-                    entry.classList.add('link-data-sent');
-                }
-                else if (cleanLog.includes('LINK_DATA_RECEIVED:')) {
-                    // Extract size and source
-                    let sizeMatch = cleanLog.match(/Size=(\d+) bytes/);
-                    let size = sizeMatch ? sizeMatch[1] : "unknown";
-                    
-                    // Extract source with hash pattern
-                    let sourceMatch = cleanLog.match(/Source=([^(]+)\(([^)]+)\)/);
-                    let source = "unknown";
-                    let sourceHash = "";
-                    
-                    if (sourceMatch) {
-                        source = sourceMatch[1];
-                        sourceHash = sourceMatch[2];
-                    } else {
-                        // Fallback to simple source extraction
-                        let simpleSourceMatch = cleanLog.match(/Source=([^,]+)/);
-                        source = simpleSourceMatch ? simpleSourceMatch[1] : "unknown";
+                    if (nodeMatch) {
+                        const [_, node] = nodeMatch;
+                        const age = ageMatch ? ageMatch[1] : '';
+                        
+                        icon = '✂️';
+                        messageText = `LINK CLOSED: ${node}${age ? ` (${age})` : ''}`;
+                        entry.classList.add('link-closed');
                     }
+                }
+                else if (cleanLog.includes('LINK STATUS REPORT') || 
+                        (cleanLog.includes('Link to') && cleanLog.includes('ACTIVE'))) {
                     
-                    // Extract link ID
-                    let linkIdMatch = cleanLog.match(/Link=([^,]+)/);
-                    let linkId = linkIdMatch ? linkIdMatch[1] : "unknown";
+                    const activeMatch = cleanLog.match(/Active Links: (\d+)/);
+                    const linkDetailsMatch = cleanLog.match(/Link to (\w+): ACTIVE \[(.*?)\]/);
                     
-                    // Extract signal metrics if available
-                    let metricsMatch = cleanLog.match(/\[(.*?)\]/);
-                    let metrics = metricsMatch ? ` [${metricsMatch[1]}]` : "";
-                    
-                    let sourceDisplay = sourceHash ? `${source} (${sourceHash})` : source;
-                    formattedLog = `LINK DATA RECEIVED: ${size} bytes from ${sourceDisplay}${metrics}`;
-                    entry.classList.add('link-data-received');
+                    if (activeMatch) {
+                        const [_, linkCount] = activeMatch;
+                        
+                        icon = '📊';
+                        messageText = `LINK STATUS: ${linkCount} active links`;
+                        entry.classList.add('status-report');
+                    } 
+                    else if (linkDetailsMatch) {
+                        const [_, node, details] = linkDetailsMatch;
+                        
+                        // Extract RSSI/SNR if available
+                        let signalInfo = '';
+                        const rssiMatch = details.match(/RSSI: (-\d+) dBm/);
+                        const snrMatch = details.match(/SNR: (\d+\.\d+) dB/);
+                        
+                        if (rssiMatch && snrMatch) {
+                            signalInfo = ` [${rssiMatch[1]} dBm / ${snrMatch[1]} dB]`;
+                        }
+                        
+                        // Extract activity info
+                        const inactiveMatch = details.match(/Inactive: ([^ ,]+)/);
+                        const ageMatch = details.match(/Age: ([^ ,]+)/);
+                        
+                        let activityInfo = '';
+                        if (inactiveMatch) {
+                            activityInfo = ` • Inactive: ${inactiveMatch[1]}`;
+                        }
+                        if (ageMatch) {
+                            activityInfo += ` • Age: ${ageMatch[1]}`;
+                        }
+                        
+                        icon = '🔗';
+                        messageText = `LINK ACTIVE: ${node}${signalInfo}${activityInfo}`;
+                        entry.classList.add('status-report');
+                    }
+                }
+                else if (cleanLog.includes('Updated peer:')) {
+                    const match = cleanLog.match(/Updated peer: (\w+) \(<([^>]+)/);
+                    if (match) {
+                        const [_, peer, hashPrefix] = match;
+                        
+                        icon = '👤';
+                        messageText = `PEER UPDATE: ${peer}`;
+                        entry.classList.add('announce');
+                    }
+                } 
+                else if (cleanLog.includes('LINK_DATA_RECEIVED:')) {
+                    // Skip detailed link data messages as they're too verbose
+                    return;
                 }
                 else {
-                    return; // Skip any other log lines
+                    // For any other message type
+                    messageText = cleanLog;
                 }
                 
-                entry.textContent = displayTime + formattedLog;
-                logContent.appendChild(entry);
+                // Create icon element if we have one
+                if (icon) {
+                    const iconElement = document.createElement('span');
+                    iconElement.className = 'message-icon';
+                    iconElement.textContent = icon;
+                    entry.appendChild(iconElement);
+                }
+                
+                // Add time and message
+                entry.appendChild(timeElement);
+                messageElement.textContent = messageText;
+                entry.appendChild(messageElement);
+                
+                // Only add entries that match active filters
+                if (entry.classList.length === 1) {
+                    // If no specific class was added (just 'log-entry'), always show it
+                    logContent.appendChild(entry);
+                } else if (activeFilters.some(filter => entry.classList.contains(filter))) {
+                    // Otherwise, only show if its type is in active filters
+                    logContent.appendChild(entry);
+                }
             });
             
             // Auto-scroll unless user has manually scrolled up
@@ -625,8 +717,74 @@ else if (cleanLog.includes('DELIVERY_CONFIRMED:')) {
             }
         });
 
+        // Set up filter buttons
+        document.querySelectorAll('.filter-button').forEach(button => {
+            button.addEventListener('click', function() {
+                this.classList.toggle('active');
+                // If we have logs, redisplay them with new filters
+                if (lastLogs.length > 0) {
+                    displayLogs(lastLogs);
+                }
+                // Save filter state to localStorage
+                saveFilterState();
+            });
+        });
+        
+        // Set up filter action buttons
+        document.getElementById('selectAllFilters').addEventListener('click', function() {
+            document.querySelectorAll('.filter-button').forEach(button => {
+                button.classList.add('active');
+            });
+            if (lastLogs.length > 0) {
+                displayLogs(lastLogs);
+            }
+            saveFilterState();
+        });
+        
+        document.getElementById('clearAllFilters').addEventListener('click', function() {
+            document.querySelectorAll('.filter-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            if (lastLogs.length > 0) {
+                displayLogs(lastLogs);
+            }
+            saveFilterState();
+        });
+        
+        // Save filter state to localStorage
+        function saveFilterState() {
+            const filterState = {};
+            document.querySelectorAll('.filter-button').forEach(button => {
+                const type = button.getAttribute('data-type');
+                filterState[type] = button.classList.contains('active');
+            });
+            localStorage.setItem('packetLogFilters', JSON.stringify(filterState));
+        }
+        
+        // Load filter state from localStorage
+        function loadFilterState() {
+            try {
+                const filterState = JSON.parse(localStorage.getItem('packetLogFilters'));
+                if (filterState) {
+                    document.querySelectorAll('.filter-button').forEach(button => {
+                        const type = button.getAttribute('data-type');
+                        if (filterState[type] === false) {
+                            button.classList.remove('active');
+                        } else if (filterState[type] === true) {
+                            button.classList.add('active');
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading filter state:', e);
+            }
+        }
+        
         // Initial connection
         connectEventSource();
+        
+        // Load saved filter state
+        loadFilterState();
     </script>
 </body>
 </html>
