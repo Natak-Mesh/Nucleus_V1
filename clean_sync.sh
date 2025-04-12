@@ -76,6 +76,8 @@ cp -v /home/natak/reticulum_mesh/mesh_controller/README.md "$CLEAN_REPO_DIR/reti
 
 # OGM Monitor
 cp -v /home/natak/reticulum_mesh/ogm_monitor/ogm_monitor.py "$CLEAN_REPO_DIR/reticulum_mesh/ogm_monitor/"
+cp -v /home/natak/reticulum_mesh/ogm_monitor/enhanced_ogm_monitor.py "$CLEAN_REPO_DIR/reticulum_mesh/ogm_monitor/"
+cp -v /home/natak/reticulum_mesh/ogm_monitor/node_status.json "$CLEAN_REPO_DIR/reticulum_mesh/ogm_monitor/"
 cp -v /home/natak/reticulum_mesh/ogm_monitor/README.md "$CLEAN_REPO_DIR/reticulum_mesh/ogm_monitor/"
 
 # RNS Stats
