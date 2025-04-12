@@ -29,11 +29,7 @@
     frequency = 915000000
     bandwidth = 250000
     txpower = 20
-    spreadingfactor = 9
-    # CDMA settings next two lines
-    # persistence = 255
-    # slottime = i
-    # flow_control = True
+    spreadingfactor = 11
     codingrate = 5
     mode = full
     bitrate = 1300  # 1.3 kbps for typical LoRa config

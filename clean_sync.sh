@@ -10,6 +10,7 @@ mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/ogm_monitor"
 mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/rns_stats"
 mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/atak_module/utils"
 mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module"
+mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation"
 mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/pending"
 mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/processing"
 mkdir -p "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/incoming"
@@ -98,6 +99,19 @@ cp -v /home/natak/reticulum_mesh/tak_transmission/atak_module/utils/cot_zstd_dec
 # Reticulum Module
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/reticulum_handler.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/"
+
+# New Implementation Reticulum Module
+echo "Copying new implementation reticulum module components..."
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/__init__.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/config.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/logger.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/file_manager.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/link_manager.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/packet_manager.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/reticulum_handler.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/run_reticulum.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 
 # Create .gitkeep files for empty directories
 touch "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/pending/.gitkeep"
