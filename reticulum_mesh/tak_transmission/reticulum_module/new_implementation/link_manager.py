@@ -3,211 +3,128 @@
 import os
 import json
 import time
-import threading
 import RNS
 import config
 import logger
 
-class LinkHandler:
-    """Handler for link callbacks"""
-    
-    def __init__(self, parent, hostname):
-        """
-        Initialize the link handler
-        
-        Args:
-            parent (LinkManager): Parent link manager
-            hostname (str): Hostname this handler is for
-        """
-        self.parent = parent
-        self.hostname = hostname
-        self.logger = logger.get_logger("LinkHandler")
-    
-    def link_established(self, link):
-        """Handle link established event"""
-        self.logger.info(f"Link established to {self.hostname}")
-    
-    def link_closed(self, link):
-        """Handle link closed event"""
-        self.logger.info(f"Link closed to {self.hostname}")
-
-
 class LinkManager:
-    def __init__(self, identity):
-        """Initialize the link manager with an RNS identity."""
+    def __init__(self):
+        """Initialize the link manager."""
         self.logger = logger.get_logger("LinkManager")
-        self.identity = identity
-        self.active_links = {}  # destination_hash -> (Link, hostname)
-        self.running = True
-        self.monitor_thread = None
-
-    def start(self):
-        """Start the link manager monitoring thread."""
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True
-        self.monitor_thread.start()
-
-    def stop(self):
-        """Stop the link manager and cleanup."""
-        self.running = False
-        if self.monitor_thread:
-            self.monitor_thread.join()
-        for dest_hash in list(self.active_links.keys()):
-            self._remove_link(dest_hash)
-
-    def _monitor_loop(self):
-        """Main monitoring loop."""
-        self.logger.info("Link manager monitor loop started")
-        while self.running:
-            try:
-                self._check_peers()
-                self._update_link_status()
-                time.sleep(config.LINK_MONITOR_INTERVAL)
-            except Exception as e:
-                self.logger.error(f"Error in link manager monitor loop: {e}")
+        self.identity = RNS.Identity()
+        self.active_outgoing_links = {}  # hostname -> Link for outgoing connections
+        self.active_incoming_links = []  # List of incoming links
+        
+        # Create incoming destination for receiving connections
+        self.incoming_destination = RNS.Destination(
+            self.identity,
+            RNS.Destination.IN,
+            RNS.Destination.SINGLE,
+            config.APP_NAME,
+            config.ASPECT
+        )
+        
+        # Set up callback for incoming connections
+        self.incoming_destination.set_link_established_callback(self._incoming_link_established)
 
     def _check_peers(self):
-        """Check peer_discovery.json and maintain links."""
+        """Check peer_discovery.json and establish links."""
         try:
-            self.logger.info("Checking peers from peer_discovery.json")
+            # Read peer_discovery.json
             with open(os.path.join(os.path.dirname(__file__), "peer_discovery.json"), 'r') as f:
                 peer_data = json.load(f)
 
             current_time = time.time()
             
-            # Check for new or updated peers
+            # Process each peer
             for hostname, peer in peer_data.get('peers', {}).items():
-                self.logger.info(f"Processing peer {hostname} with hash {peer['destination_hash']}")
-                dest_hash = peer['destination_hash']
-                last_seen = peer['last_seen']
-
                 # Skip old peers
-                if current_time - last_seen > config.PEER_TIMEOUT:
+                if current_time - peer['last_seen'] > config.PEER_TIMEOUT:
                     continue
 
-                # Establish link if needed
-                if dest_hash not in self.active_links:
-                    self.logger.info(f"No active link for {hostname}, attempting to establish one")
-                    self._establish_link(dest_hash, hostname)
+                # Skip if we already have an outgoing link
+                if hostname in self.active_outgoing_links:
+                    continue
 
-            # Remove stale peers
-            for dest_hash in list(self.active_links.keys()):
-                hostname = self.active_links[dest_hash][1]
-                if hostname not in peer_data.get('peers', {}):
-                    self._remove_link(dest_hash)
+                # Get destination hash and convert to bytes
+                dest_hash = bytes.fromhex(peer['destination_hash'])
 
-        except FileNotFoundError:
-            self.logger.warning("peer_discovery.json not found")
-        except json.JSONDecodeError:
-            self.logger.error("Invalid JSON in peer_discovery.json")
+                # Check if we have a path
+                if not RNS.Transport.has_path(dest_hash):
+                    self.logger.info(f"No path to {hostname}, requesting...")
+                    RNS.Transport.request_path(dest_hash)
+                    continue
+
+                # Get peer identity
+                peer_identity = RNS.Identity.recall(dest_hash)
+                if not peer_identity:
+                    self.logger.error(f"Could not recall identity for {hostname}")
+                    continue
+
+                # Create destination
+                destination = RNS.Destination(
+                    peer_identity,
+                    RNS.Destination.OUT,
+                    RNS.Destination.SINGLE,
+                    config.APP_NAME,
+                    config.ASPECT
+                )
+
+                # Create link
+                self.logger.info(f"Establishing link to {hostname}")
+                link = RNS.Link(
+                    destination,
+                    established_callback=lambda l, h=hostname: self._link_established(l, h),
+                    closed_callback=lambda l, h=hostname: self._link_closed(l, h)
+                )
+                self.active_outgoing_links[hostname] = link
+
         except Exception as e:
             self.logger.error(f"Error checking peers: {e}")
 
-    def _establish_link(self, dest_hash, hostname):
-        """Establish a new link to a peer."""
-        try:
-            # Convert hash to bytes
-            dest_hash_bytes = bytes.fromhex(dest_hash)
-            
-            # Check if we have a path
-            has_path = RNS.Transport.has_path(dest_hash_bytes)
-            self.logger.info(f"Path check for {hostname}: {'EXISTS' if has_path else 'NO PATH'}")
-            
-            if not has_path:
-                self.logger.info(f"No path to {hostname}, skipping link establishment")
-                return
+    def _incoming_link_established(self, link):
+        """Handle incoming link establishment."""
+        self.logger.info("Incoming link established")
+        # Set callbacks for the incoming link
+        link.set_link_closed_callback(lambda l: self._incoming_link_closed(l))
+        # Store the incoming link
+        self.active_incoming_links.append(link)
 
-            # Now recall the peer's identity
-            peer_identity = RNS.Identity.recall(dest_hash_bytes)
-            if not peer_identity:
-                self.logger.error(f"Could not recall identity for {hostname}")
-                return
+    def _incoming_link_closed(self, link):
+        """Handle incoming link closed."""
+        self.logger.info("Incoming link closed")
+        # Remove the link from active incoming links
+        if link in self.active_incoming_links:
+            self.active_incoming_links.remove(link)
 
-            # Create outgoing destination
-            outgoing_dest = RNS.Destination(
-                peer_identity,
-                RNS.Destination.OUT,
-                RNS.Destination.SINGLE,
-                config.APP_NAME,
-                config.ASPECT
-            )
+    def _link_established(self, link, hostname):
+        """Handle outgoing link established."""
+        self.logger.info(f"Link established to {hostname}")
 
-            # Create link handler for callbacks
-            handler = LinkHandler(self, hostname)
+    def _link_closed(self, link, hostname):
+        """Handle link closed."""
+        self.logger.info(f"Link closed to {hostname}")
+        if hostname in self.active_outgoing_links:
+            del self.active_outgoing_links[hostname]
 
-            # Create link with outgoing destination
-            link = RNS.Link(
-                outgoing_dest,
-                established_callback=handler.link_established,
-                closed_callback=handler.link_closed
-            )
-            self.active_links[dest_hash] = (link, hostname)
-            self.logger.info(f"Link setup initiated to {hostname}")
+    def start(self):
+        """Start checking for peers."""
+        while True:
+            try:
+                self._check_peers()
+                time.sleep(config.LINK_MONITOR_INTERVAL)
+            except Exception as e:
+                self.logger.error(f"Error in monitor loop: {e}")
+                time.sleep(5)  # Wait a bit on error
 
-        except Exception as e:
-            self.logger.error(f"Error establishing link to {hostname}: {e}")
-
-    def _update_link_status(self):
-        """Update link_status.json with current link states."""
-        try:
-            status_data = {
-                "timestamp": time.time(),
-                "links": {}
-            }
-
-            for dest_hash, (link, hostname) in self.active_links.items():
-                status_data["links"][dest_hash] = {
-                    "link_id": str(link),
-                    "status": self._get_link_status(link),
-                    "hostname": hostname
-                }
-
-            os.makedirs(os.path.dirname(config.LINK_STATUS_PATH), exist_ok=True)
-            with open(config.LINK_STATUS_PATH, 'w') as f:
-                json.dump(status_data, f, indent=2)
-
-        except Exception as e:
-            self.logger.error(f"Error updating link status: {e}")
-
-    def _remove_link(self, dest_hash):
-        """Remove a link and clean up."""
-        if dest_hash in self.active_links:
-            link, hostname = self.active_links[dest_hash]
+    def stop(self):
+        """Stop and clean up links."""
+        # Clean up outgoing links
+        for hostname, link in list(self.active_outgoing_links.items()):
             link.teardown()
-            del self.active_links[dest_hash]
-            self.logger.info(f"Removed link to {hostname}")
-
-    def link_established(self, link):
-        """Handle incoming link established event"""
-        try:
-            # Get source hash if available
-            source_hash = RNS.prettyhexrep(link.destination.hash) if hasattr(link, 'destination') and hasattr(link.destination, 'hash') else "unknown"
-            self.logger.info(f"Incoming link established from {source_hash}")
-            
-            # Create handler for this link
-            handler = LinkHandler(self, source_hash)
-            
-            # Set up callbacks
-            link.set_link_closed_callback(handler.link_closed)
-            link.set_packet_callback(handler.link_established)
-            
-            # Store in active links if not already there
-            if source_hash not in self.active_links:
-                self.active_links[source_hash] = (link, source_hash)
-                self.logger.info(f"Added incoming link from {source_hash} to active links")
-            else:
-                self.logger.info(f"Link from {source_hash} already in active links")
-            
-        except Exception as e:
-            self.logger.error(f"Error handling incoming link: {e}")
-
-    def _get_link_status(self, link):
-        """Get the string representation of a link's status."""
-        status_map = {
-            RNS.Link.PENDING: "PENDING",
-            RNS.Link.HANDSHAKE: "HANDSHAKE",
-            RNS.Link.ACTIVE: "ACTIVE",
-            RNS.Link.STALE: "STALE",
-            RNS.Link.CLOSED: "CLOSED"
-        }
-        return status_map.get(link.status, "UNKNOWN")
+            del self.active_outgoing_links[hostname]
+        
+        # Clean up incoming links
+        for link in self.active_incoming_links:
+            link.teardown()
+        self.active_incoming_links.clear()

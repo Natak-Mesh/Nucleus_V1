@@ -15,22 +15,13 @@ def main():
     # Initialize RNS (will use existing config)
     RNS.Reticulum()
     
-    # Create identity and destination
-    identity = RNS.Identity()
-    destination = RNS.Destination(
-        identity,
-        RNS.Destination.IN,  # Direction - we want to receive announces
-        RNS.Destination.SINGLE,  # Type - for single destination encryption
-        config.APP_NAME,  # From your config
-        config.ASPECT  # From your config as separate aspect
-    )
-    
     # Initialize peer discovery - this will automatically:
+    # - Create identity and destination
     # - Set up the announce handler
     # - Start periodic announces (every ANNOUNCE_INTERVAL seconds)
     # - Handle peer tracking
     # - Clean stale peers (after PEER_TIMEOUT seconds)
-    peer_discovery = PeerDiscovery(identity, destination)
+    peer_discovery = PeerDiscovery()
     
     try:
         while True:

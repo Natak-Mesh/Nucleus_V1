@@ -6,7 +6,16 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 
 ## Core Functionality
 
-### 1. Configuration and Filtering
+### 1. Identity and Destination Management
+- Creates this node's identity and "IN" destination internally on initialization
+- The "IN" destination is created with:
+  - RNS.Destination.IN direction (for receiving)
+  - RNS.Destination.SINGLE type (for encrypted communication)
+  - APP_NAME and ASPECT from config
+- This destination is what other nodes will use to communicate with us
+- The destination is announced periodically to let other nodes know how to reach us
+
+### 2. Configuration and Filtering
 - Uses config.py for key settings:
   - APP_NAME and ASPECT for filtering announces (e.g., "atak.cot")
   - ANNOUNCE_INTERVAL for periodic announces (60 seconds)
@@ -23,9 +32,15 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 - A thread runs in the background to periodically send announces every ANNOUNCE_INTERVAL seconds
 - Skips processing of our own announces to prevent loops
 
+### Critical Implementation Detail: Destination Hashes
+
+**IMPORTANT**: The destination hash stored in peer_discovery.json MUST be the one received directly from Reticulum announces. Never try to derive it from the public key, as this will break routing. A destination hash in Reticulum includes aspects, destination type, and other characteristics - it is not just a hash of the public key.
+
+This was a critical bug discovered in earlier versions where deriving the hash from public key prevented path discovery. Always use the destination_hash parameter provided to the received_announce() method.
+
 ### 3. State Management
 - In-memory state:
-  - `peer_map`: Maps hostnames to RNS.Identity objects
+  - `peer_map`: Maps hostnames to peer data including identity and destination_hash
   - `identity_to_hostname`: Maps identity hash strings to hostnames
   - `last_seen`: Tracks when each peer was last seen
 - JSON state file (peer_discovery.json):
@@ -56,13 +71,14 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 
 ## Link Establishment Support
 
-The module maintains destination hashes that other modules need for establishing links:
-1. Get destination_hash from peer_discovery.json
-2. Use RNS.Identity.recall(destination_hash) to get the Identity
-3. Use Identity + APP_NAME + ASPECT to create Destination
-4. Use Destination to create Link
+PeerDiscovery creates and announces this node's "IN" destination that other nodes will use to communicate with us. Other modules that want to establish outgoing links to peers need to:
 
-This separation allows other modules to establish links without needing direct access to the peer discovery internals.
+1. Get the target peer's destination_hash from peer_discovery.json
+2. Use RNS.Identity.recall(destination_hash) to get their Identity
+3. Create an "OUT" destination to that peer using their Identity
+4. Use that "OUT" destination to create a Link
+
+This separation allows other modules to establish outgoing links without needing direct access to the peer discovery internals, while PeerDiscovery handles our node's incoming connectivity through its "IN" destination.
 
 ## Independence from WiFi/OGM
 
@@ -97,7 +113,7 @@ To enable quick mesh formation, the module implements a responsive announce syst
 ## Key Methods
 
 ### PeerDiscovery Class
-- `__init__(identity, destination)`: Initialize discovery module
+- `__init__()`: Initialize discovery module, create identity and "IN" destination
 - `announce_loop()`: Periodically announce our presence
 - `announce_presence()`: Send announce on the network
 - `add_peer(hostname, identity, destination_hash)`: Add a new peer

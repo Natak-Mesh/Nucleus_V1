@@ -17,13 +17,19 @@ import logger
 class PeerDiscovery:
     """Simple peer discovery and tracking for Reticulum."""
     
-    def __init__(self, identity, destination):
+    def __init__(self):
         """Initialize peer discovery"""
         self.logger = logger.get_logger("PeerDiscovery")
         
-        # Basic state
-        self.identity = identity
-        self.destination = destination
+        # Create identity and destination
+        self.identity = RNS.Identity()
+        self.destination = RNS.Destination(
+            self.identity,
+            RNS.Destination.IN,  # Direction - we want to receive announces
+            RNS.Destination.SINGLE,  # Type - for single destination encryption
+            config.APP_NAME,  # From your config
+            config.ASPECT  # From your config as separate aspect
+        )
         self.hostname = socket.gethostname()
         
         # Store peer info
