@@ -21,6 +21,7 @@ BASE_DIR = "/home/natak/reticulum_mesh"
 NODE_STATUS_PATH = f"{BASE_DIR}/ogm_monitor/node_status.json"
 IDENTITY_MAP_PATH = f"{BASE_DIR}/identity_handler/identity_map.json"
 PEER_STATUS_PATH = f"{BASE_DIR}/tak_transmission/reticulum_module/new_implementation/peer_status.json"
+LINK_STATUS_PATH = f"{BASE_DIR}/tak_transmission/reticulum_module/new_implementation/link_status.json"
 LOG_DIR = f"{BASE_DIR}/logs"
 
 # Data directories

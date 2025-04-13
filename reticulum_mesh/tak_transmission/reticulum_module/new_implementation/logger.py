@@ -8,7 +8,7 @@ Provides consistent logging across all components.
 import os
 import logging
 from datetime import datetime
-from . import config
+import config
 
 class RotatingHandler(logging.FileHandler):
     """Custom file handler that maintains last N lines"""

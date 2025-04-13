@@ -115,9 +115,20 @@ The PeerDiscovery module has been enhanced with:
 
 The PeerDiscovery module is now fully independent of WiFi/OGM status, making it more resilient and simpler. It relies solely on Reticulum's native announce mechanism to build and maintain peer awareness.
 
+### LinkManager Module
+The LinkManager module has been implemented with:
+- Robust encrypted link establishment and maintenance
+- Physical layer statistics tracking (RSSI, SNR)
+- Automatic link re-establishment for failed connections
+- Link health monitoring with configurable intervals
+- Status tracking and reporting for all active links
+- JSON export for external monitoring and integration
+- Detailed metrics and statistics for performance analysis
+
+The LinkManager integrates with the node status monitoring to focus on establishing and maintaining links to non-WiFi nodes. It efficiently manages all aspects of link lifecycle, from creation to monitoring to graceful shutdown.
+
 ### Next Steps
 The next components to implement are:
-1. LinkManager - For establishing and maintaining links between peers
-2. PacketManager - For handling reliable packet delivery with retries
-3. FileManager - For handling file operations
-4. ReticulumHandler - The main coordinator integrating all components
+1. PacketManager - For handling reliable packet delivery with retries
+2. FileManager - For handling file operations
+3. ReticulumHandler - The main coordinator integrating all components
