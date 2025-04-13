@@ -15,17 +15,8 @@ class LinkManager:
         self.active_outgoing_links = {}  # hostname -> Link for outgoing connections
         self.active_incoming_links = []  # List of incoming links
         
-        # Create incoming destination for receiving connections
-        self.incoming_destination = RNS.Destination(
-            self.identity,
-            RNS.Destination.IN,
-            RNS.Destination.SINGLE,
-            config.APP_NAME,
-            config.ASPECT
-        )
-        
-        # Set up callback for incoming connections
-        self.incoming_destination.set_link_established_callback(self._incoming_link_established)
+        # Set up callback for incoming connections on the node's IN destination
+        RNS.Transport.get_instance().get_inbound_destination().set_link_established_callback(self._incoming_link_established)
 
     def _check_peers(self):
         """Check peer_discovery.json and establish links."""

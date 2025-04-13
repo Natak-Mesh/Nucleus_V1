@@ -21,6 +21,9 @@ class PeerDiscovery:
         """Initialize peer discovery"""
         self.logger = logger.get_logger("PeerDiscovery")
         
+        # Initialize RNS
+        RNS.Reticulum()
+        
         # Create identity and destination
         self.identity = RNS.Identity()
         self.destination = RNS.Destination(

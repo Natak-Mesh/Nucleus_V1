@@ -12,9 +12,6 @@ import logger
 from peer_discovery import PeerDiscovery
 
 def main():
-    # Initialize RNS (will use existing config)
-    RNS.Reticulum()
-    
     # Initialize peer discovery - this will automatically:
     # - Create identity and destination
     # - Set up the announce handler
