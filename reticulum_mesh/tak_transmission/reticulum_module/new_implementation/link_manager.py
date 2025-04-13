@@ -8,15 +8,14 @@ import config
 import logger
 
 class LinkManager:
-    def __init__(self):
+    def __init__(self, peer_discovery):
         """Initialize the link manager."""
         self.logger = logger.get_logger("LinkManager")
-        self.identity = RNS.Identity()
         self.active_outgoing_links = {}  # hostname -> Link for outgoing connections
         self.active_incoming_links = []  # List of incoming links
         
         # Set up callback for incoming connections on the node's IN destination
-        RNS.Transport.get_instance().get_inbound_destination().set_link_established_callback(self._incoming_link_established)
+        peer_discovery.destination.set_link_established_callback(self._incoming_link_established)
 
     def _check_peers(self):
         """Check peer_discovery.json and establish links."""
