@@ -24,6 +24,9 @@ class LinkManager:
             with open(os.path.join(os.path.dirname(__file__), "peer_discovery.json"), 'r') as f:
                 peer_data = json.load(f)
 
+            # Log current link status
+            self.logger.info(self.get_link_status())
+
             current_time = time.time()
             
             # Process each peer
@@ -74,11 +77,28 @@ class LinkManager:
 
     def _incoming_link_established(self, link):
         """Handle incoming link establishment."""
-        self.logger.info("Incoming link established")
-        # Set callbacks for the incoming link
-        link.set_link_closed_callback(lambda l: self._incoming_link_closed(l))
-        # Store the incoming link
-        self.active_incoming_links.append(link)
+        try:
+            self.logger.info("Processing incoming link...")
+            self.logger.info(f"Current incoming links count: {len(self.active_incoming_links)}")
+            
+            # Log link details
+            self.logger.info(f"Link details - Destination hash: {RNS.prettyhexrep(link.destination.hash)}")
+            
+            # Set callbacks for the incoming link
+            link.set_link_closed_callback(lambda l: self._incoming_link_closed(l))
+            
+            # Store the incoming link
+            self.active_incoming_links.append(link)
+            self.logger.info(f"Added to active_incoming_links. New count: {len(self.active_incoming_links)}")
+            
+            # Log updated status after adding link
+            self.logger.info("Current link status:")
+            self.logger.info(self.get_link_status())
+            
+        except Exception as e:
+            self.logger.error(f"Error handling incoming link: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
 
     def _incoming_link_closed(self, link):
         """Handle incoming link closed."""
@@ -106,6 +126,22 @@ class LinkManager:
             except Exception as e:
                 self.logger.error(f"Error in monitor loop: {e}")
                 time.sleep(5)  # Wait a bit on error
+
+    def get_link_status(self):
+        """Return a formatted string showing all active links."""
+        status = "Active Links Status:\n"
+        
+        # Show outgoing links
+        status += "\nOutgoing Links:\n"
+        for hostname, link in self.active_outgoing_links.items():
+            status += f"- {hostname}: Connected\n"  # If it's in active_outgoing_links, it's connected
+        
+        # Show incoming links
+        status += "\nIncoming Links:\n"
+        for link in self.active_incoming_links:
+            status += f"- From: {RNS.prettyhexrep(link.destination.hash)}: Connected\n"
+        
+        return status
 
     def stop(self):
         """Stop and clean up links."""
