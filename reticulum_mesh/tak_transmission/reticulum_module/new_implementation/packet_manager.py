@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
 
 """
+##############################################################################
+#                                                                            #
+#                          !!! IMPORTANT NOTE !!!                            #
+#                                                                            #
+#  Destination Handling:                                                     #
+#  - PeerDiscovery creates and owns the IN destination                      #
+#  - PacketManager must access it through peer_discovery.destination        #
+#  - NEVER create new destinations or get through RNS.Reticulum.get_instance #
+#  - This ensures we use the same destination PeerDiscovery announced       #
+#                                                                            #
+##############################################################################
+
 Packet manager module for the Reticulum handler.
-Handles packet sending, receiving, and retry mechanism.
+Handles direct packet transmission with delivery tracking and retry mechanism.
 """
 
 import os
@@ -25,19 +37,26 @@ class PacketManager:
     - Processing received packets
     """
     
-    def __init__(self, file_manager=None, link_manager=None):
+    def __init__(self, file_manager=None, peer_discovery=None):
         """
         Initialize the packet manager
         
         Args:
             file_manager (FileManager): Reference to file manager module
-            link_manager (LinkManager): Reference to link manager module
+            peer_discovery (PeerDiscovery): Reference to peer discovery module for accessing IN destination
         """
         self.logger = logger.get_logger("PacketManager")
         
         # Store references to other modules
         self.file_manager = file_manager
-        self.link_manager = link_manager
+        self.peer_discovery = peer_discovery
+        
+        # Set up packet callback on peer_discovery's IN destination
+        if peer_discovery and peer_discovery.destination:
+            peer_discovery.destination.set_packet_callback(self.handle_incoming_packet)
+            self.logger.info("Set up packet callback on peer_discovery's IN destination")
+        else:
+            self.logger.error("No peer_discovery or destination available for receiving packets")
         
         # Retry state
         self.retry_queue = {}     # tracking_key -> retry info
@@ -60,7 +79,7 @@ class PacketManager:
     
     def send_data(self, hostname, data, filename):
         """
-        Send data to a specific hostname with retry support
+        Send data to a specific hostname with retry support using direct packet transmission
         
         Args:
             hostname (str): The hostname to send to
@@ -70,11 +89,17 @@ class PacketManager:
         Returns:
             tuple: (success, tracking_id) - success is boolean, tracking_id for tracking
         """
-        # Check if link manager is available
-        if self.link_manager is None:
-            self.logger.error(f"Cannot send data: No link manager available")
+        # Check if peer_discovery is available
+        if self.peer_discovery is None:
+            self.logger.error(f"Cannot send data: No peer_discovery available")
             return False, None
-        
+            
+        # Get peer identity from peer_discovery
+        peer_identity = self.peer_discovery.get_peer_identity(hostname)
+        if not peer_identity:
+            self.logger.error(f"Cannot send data: No identity found for {hostname}")
+            return False, None
+            
         # Generate unique packet ID from filename if available
         packet_id = "unknown"
         if "_" in filename:
@@ -93,16 +118,26 @@ class PacketManager:
             if self.file_manager:
                 buffer_saved, buffer_path = self.file_manager.save_to_buffer(data, filename)
             
-            # Try to send the packet
-            success, receipt = self.link_manager.send_data(hostname, data)
+            # Create outbound destination for this peer
+            destination = RNS.Destination(
+                peer_identity,
+                RNS.Destination.OUT,
+                RNS.Destination.SINGLE,
+                config.APP_NAME,
+                config.ASPECT
+            )
             
-            if success and receipt:
+            # Create and send the packet
+            packet = RNS.Packet(destination, data)
+            success = packet.send()
+            
+            if success:
                 # Generate tracking key
                 tracking_key = f"{hostname}_{packet_id}"
                 
                 # Set callbacks for packet delivery status tracking
-                receipt.set_delivery_callback(lambda r: self.packet_delivered(r, hostname, packet_id))
-                receipt.set_timeout_callback(lambda r: self.packet_delivery_timeout(r, hostname, packet_id))
+                packet.set_delivery_callback(lambda r: self.packet_delivered(r, hostname, packet_id))
+                packet.set_timeout_callback(lambda r: self.packet_delivery_timeout(r, hostname, packet_id))
                 
                 # Add to retry queue and buffer references if we saved to buffer
                 if buffer_saved:
@@ -122,7 +157,7 @@ class PacketManager:
                             'retry_attempts': 0,
                             'next_retry_time': None,  # None when awaiting proof
                             'status': 'awaiting_proof',
-                            'receipt_hash': receipt.hash if hasattr(receipt, 'hash') else None
+                            'packet_hash': packet.hash if hasattr(packet, 'hash') else None
                         }
                 
                 self.logger.info(f"SENT: {filename} to {hostname}")

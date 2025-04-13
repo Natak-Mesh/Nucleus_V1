@@ -1,6 +1,20 @@
-# Reticulum Handler - Modular Implementation
+# Reticulum Handler - Direct Packet Implementation
 
-A modular implementation of the Reticulum mesh networking handler that provides reliable packet delivery, link management, and peer discovery.
+A streamlined implementation of the Reticulum mesh networking handler that provides reliable packet delivery through direct packet transmission.
+
+## Key Design Principles
+
+1. **Direct Packet Transmission**
+   - No persistent links required
+   - Each packet is independently transmitted
+   - Built-in delivery confirmation
+   - Automatic retries for failed packets
+
+2. **Critical Destination Pattern**
+   - PeerDiscovery owns the IN destination
+   - All components access it through PeerDiscovery
+   - No duplicate destinations created
+   - Clean separation of responsibilities
 
 ## Architecture
 
@@ -10,8 +24,7 @@ This implementation follows a modular design with clear separation of responsibi
 ReticulumHandler
     ├── FileManager - File operations and directory management
     ├── PeerDiscovery - Announce handling and peer tracking
-    ├── LinkManager - Link establishment and monitoring
-    └── PacketManager - Packet handling and retry mechanism
+    └── PacketManager - Direct packet transmission and retry mechanism
 ```
 
 ### Components
@@ -25,22 +38,18 @@ ReticulumHandler
    - Managing buffer files for retries
 
 3. **PeerDiscovery**: Manages peer announcements and tracking:
-   - Announcing our presence on the network
-   - Processing announces from peers
-   - Tracking peer identities and states
-   - Maintaining hostname to identity mappings
+   - Creates and owns the IN destination
+   - Announces our presence on the network
+   - Processes announces from peers
+   - Maintains peer identity mapping
+   - Provides destination access to other components
 
-4. **LinkManager**: Handles link establishment and maintenance:
-   - Establishing links to peers
-   - Monitoring link health
-   - Re-establishing failed links
-   - Processing incoming/outgoing packets
-
-5. **PacketManager**: Handles packet operations:
-   - Sending packets with delivery tracking
-   - Managing packet retry mechanism with exponential backoff
+4. **PacketManager**: Handles packet operations:
+   - Direct packet transmission to peers
+   - Delivery confirmation tracking
+   - Automatic retry with exponential backoff
    - Processing incoming packets
-   - Managing buffer references for retried packets
+   - Managing buffer references for retries
 
 ## Configuration
 
@@ -55,10 +64,12 @@ All configuration settings are centralized in the `config.py` file. Important se
 ## How It Works
 
 1. The system monitors `node_modes.json` to identify peers that are in non-WiFi mode.
-2. It establishes links to these peers and maintains them.
-3. When files appear in the pending directory, they are processed and sent to all non-WiFi peers.
-4. Packets are tracked, and if delivery proof isn't received, they are automatically retried.
-5. Incoming packets are saved to files in the incoming directory.
+2. When files appear in the pending directory, they are processed and sent directly to peers.
+3. Each packet transmission includes:
+   - Automatic delivery confirmation
+   - Retry mechanism for failed deliveries
+   - Buffer management for potential retries
+4. Incoming packets are saved to files in the incoming directory.
 
 ## Running the Handler
 
@@ -79,15 +90,28 @@ Or directly:
 
 ### Identity Mapping
 
-The identity mapping section in PeerDiscovery has a placeholder that needs to be revisited. This handles the association between Reticulum identities, hostnames, and destination hashes.
+PeerDiscovery maintains the mapping between:
+- Hostnames
+- Reticulum identities
+- Destination hashes
+
+This mapping is critical for packet addressing and delivery confirmation.
 
 ### Retry Mechanism
 
-The retry mechanism uses exponential backoff with jitter to prevent retry storms. It also tracks packet delivery state and buffers sent packets for potential retries.
+The retry mechanism includes:
+- Exponential backoff with jitter to prevent retry storms
+- Configurable retry attempts and delays
+- Buffer management for retry data
+- Automatic cleanup of delivered packets
 
-### Link Management
+### Packet Delivery
 
-The link manager tracks link health and automatically re-establishes links when they fail. It also collects statistics on link quality and performance.
+Direct packet transmission provides:
+- Immediate delivery confirmation
+- Automatic retry for failed packets
+- Buffer management for retry data
+- Clean separation from transport details
 
 ## Logging
 
@@ -115,20 +139,17 @@ The PeerDiscovery module has been enhanced with:
 
 The PeerDiscovery module is now fully independent of WiFi/OGM status, making it more resilient and simpler. It relies solely on Reticulum's native announce mechanism to build and maintain peer awareness.
 
-### LinkManager Module
-The LinkManager module has been implemented with:
-- Robust encrypted link establishment and maintenance
-- Physical layer statistics tracking (RSSI, SNR)
-- Automatic link re-establishment for failed connections
-- Link health monitoring with configurable intervals
-- Status tracking and reporting for all active links
-- JSON export for external monitoring and integration
-- Detailed metrics and statistics for performance analysis
+### PacketManager Module
+The PacketManager module implements:
+- Direct packet transmission to peers
+- Built-in delivery confirmation
+- Automatic retry mechanism with exponential backoff
+- Buffer management for retries
+- Efficient packet processing and tracking
 
-The LinkManager integrates with the node status monitoring to focus on establishing and maintaining links to non-WiFi nodes. It efficiently manages all aspects of link lifecycle, from creation to monitoring to graceful shutdown.
+The PacketManager focuses on reliable packet delivery without the overhead of persistent links. It uses PeerDiscovery's IN destination for receiving packets and creates outbound destinations as needed for transmission.
 
 ### Next Steps
 The next components to implement are:
-1. PacketManager - For handling reliable packet delivery with retries
-2. FileManager - For handling file operations
-3. ReticulumHandler - The main coordinator integrating all components
+1. FileManager - For handling file operations
+2. ReticulumHandler - The main coordinator integrating all components
