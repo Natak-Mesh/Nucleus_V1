@@ -18,8 +18,9 @@ LINK_KEEPALIVE = 120    # 2 minutes - more frequent keepalives for better link m
 
 # File paths
 BASE_DIR = "/home/natak/reticulum_mesh"
-NODE_MODES_PATH = f"{BASE_DIR}/mesh_controller/node_modes.json"
+NODE_STATUS_PATH = f"{BASE_DIR}/ogm_monitor/node_status.json"
 IDENTITY_MAP_PATH = f"{BASE_DIR}/identity_handler/identity_map.json"
+PEER_STATUS_PATH = f"{BASE_DIR}/tak_transmission/reticulum_module/new_implementation/peer_status.json"
 LOG_DIR = f"{BASE_DIR}/logs"
 
 # Data directories

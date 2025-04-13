@@ -16,7 +16,7 @@ class EnhancedOGMMonitor:
     LOCAL_NODE_MAC = "00:c0:ca:b6:92:c0"  # takNode1
     
     # File paths
-    IDENTITY_MAP_PATH = "/home/natak/reticulum_mesh/identity_handler/identity_map.json"
+    HOSTNAME_MAP_PATH = "/home/natak/mesh/hostname_mapping.json"
     STATUS_FILE_PATH = "/home/natak/reticulum_mesh/ogm_monitor/node_status.json"
     
     def __init__(self):
@@ -28,7 +28,7 @@ class EnhancedOGMMonitor:
         self.node_status = {}
         
         self.logger.info("Enhanced OGM Monitor starting")
-        self.logger.info(f"Reading identity map from: {self.IDENTITY_MAP_PATH}")
+        self.logger.info(f"Reading hostname mapping from: {self.HOSTNAME_MAP_PATH}")
         self.logger.info(f"Writing status to: {self.STATUS_FILE_PATH}")
         self.logger.info("\nMonitoring mesh status (Press Ctrl+C to exit)...")
         
@@ -41,14 +41,14 @@ class EnhancedOGMMonitor:
         )
         self.logger = logging.getLogger("EnhancedOGMMonitor")
     
-    def load_identity_map(self):
-        """Load the identity map file"""
+    def load_hostname_mapping(self):
+        """Load the hostname mapping file"""
         try:
-            with open(self.IDENTITY_MAP_PATH, 'r') as f:
-                identity_map = json.load(f)
-                return identity_map.get("nodes", {})
+            with open(self.HOSTNAME_MAP_PATH, 'r') as f:
+                hostname_mapping = json.load(f)
+                return hostname_mapping
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            self.logger.error(f"Error loading identity map: {e}")
+            self.logger.error(f"Error loading hostname mapping: {e}")
             return {}
     
     def load_existing_status(self):
@@ -111,8 +111,8 @@ class EnhancedOGMMonitor:
     
     def update_node_status(self):
         """Update the status of all nodes"""
-        # Get identity map (authorized nodes)
-        identity_nodes = self.load_identity_map()
+        # Get hostname mapping (authorized nodes)
+        hostname_nodes = self.load_hostname_mapping()
         
         # Load existing status (to preserve counters, etc.)
         existing_status = self.load_existing_status()
@@ -130,60 +130,60 @@ class EnhancedOGMMonitor:
         # Initialize new status with all nodes from identity map
         node_status = {}
         
-        # Process all nodes from identity map (except local node)
-        for mac, identity in identity_nodes.items():
+        # Process all nodes from hostname mapping (except local node)
+        for mac, node_info in hostname_nodes.items():
             # Skip local node
             if mac == self.LOCAL_NODE_MAC:
                 continue
                 
-            # Start with identity information
-            node_info = {
-                "hostname": identity.get("hostname", "unknown"),
-                "ip": identity.get("ip", "unknown"),
+            # Start with hostname mapping information
+            node_data = {
+                "hostname": node_info.get("hostname", "unknown"),
+                "ip": node_info.get("ip", "unknown"),
             }
             
             # Initialize or preserve counters
             if mac in existing_status:
-                node_info["failure_count"] = existing_status[mac].get("failure_count", 0)
-                node_info["good_count"] = existing_status[mac].get("good_count", 0)
-                node_info["mode"] = existing_status[mac].get("mode", "WIFI")
+                node_data["failure_count"] = existing_status[mac].get("failure_count", 0)
+                node_data["good_count"] = existing_status[mac].get("good_count", 0)
+                node_data["mode"] = existing_status[mac].get("mode", "WIFI")
             else:
-                node_info["failure_count"] = 0
-                node_info["good_count"] = 0
-                node_info["mode"] = "WIFI"  # Default to WiFi
+                node_data["failure_count"] = 0
+                node_data["good_count"] = 0
+                node_data["mode"] = "WIFI"  # Default to WiFi
             
             # Update with Batman status if available
             if mac in batman_nodes:
                 batman_info = batman_nodes[mac]
-                node_info["last_seen"] = batman_info["last_seen"]
-                node_info["throughput"] = batman_info["throughput"]
-                node_info["nexthop"] = batman_info["nexthop"]
+                node_data["last_seen"] = batman_info["last_seen"]
+                node_data["throughput"] = batman_info["throughput"]
+                node_data["nexthop"] = batman_info["nexthop"]
                 
                 # Update counters based on current status
                 if batman_info["last_seen"] > self.FAILURE_THRESHOLD:
-                    node_info["failure_count"] += 1
-                    node_info["good_count"] = 0
-                    if node_info["failure_count"] >= self.FAILURE_COUNT:
-                        node_info["mode"] = "LORA"
+                    node_data["failure_count"] += 1
+                    node_data["good_count"] = 0
+                    if node_data["failure_count"] >= self.FAILURE_COUNT:
+                        node_data["mode"] = "LORA"
                 else:
-                    node_info["good_count"] += 1
-                    node_info["failure_count"] = 0
-                    if node_info["good_count"] >= self.RECOVERY_COUNT:
-                        node_info["mode"] = "WIFI"
+                    node_data["good_count"] += 1
+                    node_data["failure_count"] = 0
+                    if node_data["good_count"] >= self.RECOVERY_COUNT:
+                        node_data["mode"] = "WIFI"
             else:
                 # Node not seen in Batman, set conservative values
-                node_info["last_seen"] = 999.0  # Large value to indicate not seen
-                node_info["throughput"] = 0
-                node_info["nexthop"] = "unknown"
+                node_data["last_seen"] = 999.0  # Large value to indicate not seen
+                node_data["throughput"] = 0
+                node_data["nexthop"] = "unknown"
                 
                 # Update counters for unseen nodes
-                node_info["failure_count"] += 1
-                node_info["good_count"] = 0
-                if node_info["failure_count"] >= self.FAILURE_COUNT:
-                    node_info["mode"] = "LORA"
+                node_data["failure_count"] += 1
+                node_data["good_count"] = 0
+                if node_data["failure_count"] >= self.FAILURE_COUNT:
+                    node_data["mode"] = "LORA"
             
             # Add to status collection
-            node_status[mac] = node_info
+            node_status[mac] = node_data
         
         # Format and return complete status
         return {

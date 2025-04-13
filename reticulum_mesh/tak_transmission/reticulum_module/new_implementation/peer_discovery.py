@@ -10,6 +10,7 @@ import time
 import random
 import socket
 import json
+import os
 import RNS
 
 from . import config
@@ -41,12 +42,14 @@ class PeerDiscovery:
         
         # Runtime state
         self.hostname = socket.gethostname()
-        self.peer_map = {}  # hostname -> destination
+        self.peer_map = {}  # hostname -> identity
         self.last_seen = {} # hostname -> timestamp
         
-        # Identity mapping
-        self.hash_to_hostname = {}  # Hash to hostname mapping
-        self.identity_hash_to_hostname = {}  # Identity hash to hostname mapping
+        # Bidirectional identity mapping
+        self.identity_hash_to_hostname = {}  # Identity hash -> hostname
+        self.hostname_to_identity_hash = {}  # hostname -> Identity hash
+        self.dest_hash_to_hostname = {}      # Destination hash -> hostname
+        self.hostname_to_dest_hash = {}      # hostname -> Destination hash
         
         # Control flags
         self.should_quit = False
@@ -62,6 +65,11 @@ class PeerDiscovery:
         self.announce_thread = threading.Thread(target=self.announce_loop, daemon=True)
         self.announce_thread.start()
         
+        # Start JSON export thread if configured
+        if hasattr(config, 'PEER_STATUS_PATH'):
+            self.json_thread = threading.Thread(target=self.json_export_loop, daemon=True)
+            self.json_thread.start()
+        
         # Announce immediately
         self.announce_presence()
     
@@ -70,6 +78,16 @@ class PeerDiscovery:
         while not self.should_quit:
             time.sleep(config.ANNOUNCE_INTERVAL)
             self.announce_presence()
+    
+    def json_export_loop(self):
+        """Periodically export peer data to JSON"""
+        while not self.should_quit:
+            try:
+                self.export_to_json()
+                time.sleep(30)  # Export every 30 seconds
+            except Exception as e:
+                self.logger.error(f"Error in JSON export: {e}")
+                time.sleep(60)  # On error, wait longer before retrying
     
     def announce_presence(self):
         """Announce our presence to the network"""
@@ -81,7 +99,7 @@ class PeerDiscovery:
     
     def add_peer(self, hostname, identity, destination_hash=None):
         """
-        Add a peer to our peer map
+        Add a peer to our peer map with bidirectional mappings
         
         Args:
             hostname (str): The hostname of the peer
@@ -94,17 +112,19 @@ class PeerDiscovery:
         self.peer_map[hostname] = identity
         self.last_seen[hostname] = time.time()
         
-        # Store identity hash mapping
+        # Store identity hash mapping bidirectionally
         if hasattr(identity, 'hash'):
             identity_hash = RNS.prettyhexrep(identity.hash)
             self.identity_hash_to_hostname[identity_hash] = hostname
-            self.logger.debug(f"Added identity hash mapping: {identity_hash} -> {hostname}")
+            self.hostname_to_identity_hash[hostname] = identity_hash
+            self.logger.debug(f"Added identity hash mapping: {identity_hash} <-> {hostname}")
         
-        # Store destination hash mapping if provided
+        # Store destination hash mapping bidirectionally if provided
         if destination_hash is not None:
-            source_hash = RNS.prettyhexrep(destination_hash)
-            self.hash_to_hostname[source_hash] = hostname
-            self.logger.debug(f"Added destination hash mapping: {source_hash} -> {hostname}")
+            dest_hash = RNS.prettyhexrep(destination_hash)
+            self.dest_hash_to_hostname[dest_hash] = hostname
+            self.hostname_to_dest_hash[hostname] = dest_hash
+            self.logger.debug(f"Added destination hash mapping: {dest_hash} <-> {hostname}")
     
     def update_peer(self, hostname, identity=None, reset_last_seen=True):
         """
@@ -131,10 +151,17 @@ class PeerDiscovery:
                 self.logger.info(f"Identity changed for {hostname}")
                 self.peer_map[hostname] = identity
                 
-                # Update identity hash mapping
+                # Update identity hash mappings bidirectionally
                 if hasattr(identity, 'hash'):
+                    # Remove old mapping if it exists
+                    if hostname in self.hostname_to_identity_hash:
+                        old_hash = self.hostname_to_identity_hash[hostname]
+                        self.identity_hash_to_hostname.pop(old_hash, None)
+                    
+                    # Add new mapping
                     identity_hash = RNS.prettyhexrep(identity.hash)
                     self.identity_hash_to_hostname[identity_hash] = hostname
+                    self.hostname_to_identity_hash[hostname] = identity_hash
                     
                 # Return True to indicate identity changed
                 return True
@@ -157,6 +184,28 @@ class PeerDiscovery:
         """
         return self.peer_map.get(hostname)
     
+    def get_peer_by_any_hash(self, hash_str):
+        """
+        Find a peer by any type of hash
+        
+        Args:
+            hash_str (str): The hash string to look up
+            
+        Returns:
+            tuple: (hostname, identity) if found, or (None, None) if not found
+        """
+        # Try identity hash first
+        hostname = self.identity_hash_to_hostname.get(hash_str)
+        if hostname:
+            return hostname, self.peer_map.get(hostname)
+            
+        # Then try destination hash
+        hostname = self.dest_hash_to_hostname.get(hash_str)
+        if hostname:
+            return hostname, self.peer_map.get(hostname)
+            
+        return None, None
+    
     def get_hostname_from_hash(self, hash_str):
         """
         Get a hostname from a hash
@@ -172,29 +221,10 @@ class PeerDiscovery:
             return self.identity_hash_to_hostname[hash_str]
         
         # Then check the destination hash map
-        if hash_str in self.hash_to_hostname:
-            return self.hash_to_hostname[hash_str]
+        if hash_str in self.dest_hash_to_hostname:
+            return self.dest_hash_to_hostname[hash_str]
         
         return None
-    
-    def get_hostname_for_mac(self, mac_address):
-        """
-        Get hostname for a MAC address from identity_map.json
-        
-        Args:
-            mac_address (str): The MAC address to look up
-            
-        Returns:
-            str: The hostname, or None if not found
-        """
-        try:
-            with open(config.IDENTITY_MAP_PATH, 'r') as f:
-                identity_map = json.load(f)
-                node_data = identity_map.get('nodes', {}).get(mac_address, {})
-                return node_data.get('hostname')
-        except Exception as e:
-            self.logger.error(f"Error reading identity_map.json: {e}")
-            return None
     
     def clean_stale_peers(self):
         """
@@ -213,48 +243,79 @@ class PeerDiscovery:
                 # Remove from peer map and last seen
                 self.last_seen.pop(hostname, None)
                 
+                # Remove identity hash mappings
+                if hostname in self.hostname_to_identity_hash:
+                    identity_hash = self.hostname_to_identity_hash[hostname]
+                    self.identity_hash_to_hostname.pop(identity_hash, None)
+                    self.hostname_to_identity_hash.pop(hostname, None)
+                
+                # Remove destination hash mappings
+                if hostname in self.hostname_to_dest_hash:
+                    dest_hash = self.hostname_to_dest_hash[hostname]
+                    self.dest_hash_to_hostname.pop(dest_hash, None)
+                    self.hostname_to_dest_hash.pop(hostname, None)
+                
                 # Remove from peer map
                 if hostname in self.peer_map:
-                    # Get identity hash before removing
-                    if hasattr(self.peer_map[hostname], 'hash'):
-                        identity_hash = RNS.prettyhexrep(self.peer_map[hostname].hash)
-                        # Remove from identity hash map
-                        self.identity_hash_to_hostname.pop(identity_hash, None)
-                    
-                    # Remove from peer map
                     self.peer_map.pop(hostname, None)
-                
-                # Find and remove from hash map
-                hashes_to_remove = []
-                for hash_str, h in self.hash_to_hostname.items():
-                    if h == hostname:
-                        hashes_to_remove.append(hash_str)
-                
-                for hash_str in hashes_to_remove:
-                    self.hash_to_hostname.pop(hash_str, None)
                 
                 removed_peers.append(hostname)
         
         return removed_peers
     
-    def get_non_wifi_nodes(self):
-        """
-        Get list of MAC addresses for nodes not in WIFI mode
-        
-        Returns:
-            list: List of MAC addresses
-        """
+    def export_to_json(self):
+        """Export peer information to JSON file for IPC"""
         try:
-            with open(config.NODE_MODES_PATH, 'r') as f:
-                node_modes = json.load(f)
-                return [mac for mac, data in node_modes.items() if data.get('mode') != 'WIFI']
+            if not hasattr(config, 'PEER_STATUS_PATH'):
+                return
+                
+            # Create output data structure
+            output = {
+                "last_updated": int(time.time()),
+                "peers": {}
+            }
+            
+            # Add data for each peer
+            for hostname, identity in self.peer_map.items():
+                if hostname in self.last_seen:
+                    peer_data = {
+                        "last_seen": self.last_seen[hostname]
+                    }
+                    
+                    if hostname in self.hostname_to_identity_hash:
+                        peer_data["identity_hash"] = self.hostname_to_identity_hash[hostname]
+                        
+                    if hostname in self.hostname_to_dest_hash:
+                        peer_data["destination_hash"] = self.hostname_to_dest_hash[hostname]
+                    
+                    output["peers"][hostname] = peer_data
+            
+            # Write to file (atomic)
+            directory = os.path.dirname(config.PEER_STATUS_PATH)
+            if not os.path.exists(directory):
+                os.makedirs(directory, exist_ok=True)
+                
+            temp_path = f"{config.PEER_STATUS_PATH}.tmp"
+            with open(temp_path, 'w') as f:
+                json.dump(output, f, indent=2)
+                
+            os.replace(temp_path, config.PEER_STATUS_PATH)
+            
+            self.logger.debug(f"Exported peer status to {config.PEER_STATUS_PATH}")
+            
         except Exception as e:
-            self.logger.error(f"Error reading node_modes.json: {e}")
-            return []
+            self.logger.error(f"Error exporting peer status to JSON: {e}")
     
     def shutdown(self):
         """Gracefully shutdown peer discovery"""
         self.should_quit = True
+        
+        # Export one last time before shutting down
+        if hasattr(config, 'PEER_STATUS_PATH'):
+            try:
+                self.export_to_json()
+            except:
+                pass
 
 
 class AnnounceHandler:
@@ -292,16 +353,20 @@ class AnnounceHandler:
             self.known_peers.add(destination_hash)
             
             if app_data:
-                # TODO: Identity mapping implementation to be discussed and revisited
-                # The remainder of this method will handle processing of announces,
-                # associating identity hashes with hostnames, and tracking peer activity
+                # Process the announce data to extract hostname
+                hostname = None
+                try:
+                    if isinstance(app_data, bytes):
+                        hostname = app_data.decode('utf-8')
+                    else:
+                        hostname = str(app_data)
+                except:
+                    self.logger.warning(f"Could not decode app_data in announce from {RNS.prettyhexrep(destination_hash)}")
+                    return
                 
-                # Placeholder for now - we'll revisit the identity mapping logic
-                hostname = app_data.decode() if isinstance(app_data, bytes) else str(app_data)
-                self.logger.info(f"Received announce from {hostname} ({RNS.prettyhexrep(destination_hash)})")
-                
-                # Basic tracking - will be expanded later
                 if hostname:
+                    self.logger.info(f"Received announce from {hostname} ({RNS.prettyhexrep(destination_hash)})")
+                    
                     # Store in parent's peer map
                     self.parent.add_peer(hostname, announced_identity, destination_hash)
                     
@@ -320,6 +385,10 @@ class AnnounceHandler:
                         # Start announce thread
                         thread = threading.Thread(target=delayed_announce, daemon=True)
                         thread.start()
+                else:
+                    self.logger.warning(f"Received announce with empty hostname from {RNS.prettyhexrep(destination_hash)}")
+            else:
+                self.logger.warning(f"Received announce with no app_data from {RNS.prettyhexrep(destination_hash)}")
         
         except Exception as e:
             self.logger.error(f"Error processing announce: {e}")

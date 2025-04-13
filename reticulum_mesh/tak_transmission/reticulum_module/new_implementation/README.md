@@ -92,3 +92,32 @@ The link manager tracks link health and automatically re-establishes links when 
 ## Logging
 
 All components produce detailed logs to aid in troubleshooting and monitoring. The logging format and verbosity can be adjusted in the config.py file.
+
+## Implementation Progress
+
+### Enhanced OGM Monitor
+We've implemented an enhanced OGM (Originator Message) monitor that:
+- Tracks the status of all mesh nodes using Batman-adv originator data
+- Determines node modes (WIFI/LORA) based on connection quality metrics
+- Outputs detailed status to `node_status.json` for use by other components
+- Provides real-time console output showing node status and mode
+
+### PeerDiscovery Module
+The PeerDiscovery module has been enhanced with:
+- Completely transport-agnostic peer discovery and tracking
+- Bidirectional mapping between all identity representations
+- Responsive announce system for faster mesh formation
+  - When a new peer is discovered, sends an immediate response announce
+  - Uses random delays (0.5-2.0s) to prevent announce storms
+- Optional JSON export for inter-process visibility
+  - Provides status information to other programs without IPC
+  - Updates every 30 seconds with current peer information
+
+The PeerDiscovery module is now fully independent of WiFi/OGM status, making it more resilient and simpler. It relies solely on Reticulum's native announce mechanism to build and maintain peer awareness.
+
+### Next Steps
+The next components to implement are:
+1. LinkManager - For establishing and maintaining links between peers
+2. PacketManager - For handling reliable packet delivery with retries
+3. FileManager - For handling file operations
+4. ReticulumHandler - The main coordinator integrating all components

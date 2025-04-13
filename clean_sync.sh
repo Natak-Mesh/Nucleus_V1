@@ -114,6 +114,7 @@ cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implement
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/reticulum_handler.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/run_reticulum.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery_README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 
 # Create .gitkeep files for empty directories
 touch "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/pending/.gitkeep"
