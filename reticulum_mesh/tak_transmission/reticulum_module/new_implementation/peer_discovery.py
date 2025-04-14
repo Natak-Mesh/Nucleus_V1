@@ -33,6 +33,11 @@ class PeerDiscovery:
             config.APP_NAME,  # From your config
             config.ASPECT  # From your config as separate aspect
         )
+        
+        # Configure destination to automatically prove all received packets
+        self.destination.set_proof_strategy(RNS.Destination.PROVE_ALL)
+        self.logger.info("Set destination to automatically prove all packets")
+        
         self.hostname = socket.gethostname()
         
         # Store peer info
