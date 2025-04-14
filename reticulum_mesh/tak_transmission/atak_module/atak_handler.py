@@ -125,7 +125,7 @@ class ATAKHandler:
         self.recent_packets = deque(maxlen=self.MAX_RECENT_PACKETS)
         
         # Node modes path
-        self.node_modes_path = "/home/natak/reticulum_mesh/mesh_controller/node_modes.json"
+        self.node_modes_path = "/home/natak/reticulum_mesh/ogm_monitor/node_status.json"
         
         # Set up ATAK listening sockets for receiving
         self.setup_atak_listening_sockets()
@@ -193,11 +193,15 @@ class ATAKHandler:
         return False
     
     def get_non_wifi_nodes(self):
-        """Get list of MAC addresses for nodes not in WIFI mode"""
+        """Get list of nodes in LORA mode"""
         try:
             with open(self.node_modes_path, 'r') as f:
-                node_modes = json.load(f)
-                return [mac for mac, data in node_modes.items() if data.get('mode') != 'WIFI']
+                status = json.load(f)
+                return [
+                    node["hostname"] 
+                    for node in status.get("nodes", {}).values()
+                    if node.get("mode") == "LORA"
+                ]
         except Exception:
             return []
             
@@ -228,20 +232,12 @@ class ATAKHandler:
             output = subprocess.check_output("networkctl status br0", shell=True).decode()
             leases = set()
             found_leases = False
-            print("\nParsing networkctl output for DHCP leases:")
             for line in output.split('\n'):
                 stripped = line.strip()
-                print(f"DEBUG Line: {stripped!r}")
-                print(f"DEBUG Contains marker? {'Offered DHCP leases: ' in stripped}")
-                print(f"DEBUG Contains (to? {'(to' in line}")
-                
                 if "Offered DHCP leases: " in stripped:
                     found_leases = True
-                    print(f"DEBUG Found marker line!")
                 if "(to" in line:
-                    print(f"DEBUG Found (to in line!")
                     ip = line.strip().split("(to")[0].replace("Offered DHCP leases:", "").strip()
-                    print(f"DEBUG Extracted IP: {ip!r}")
                     if ip and ":" not in ip:
                         print(f"Found lease IP: {ip}")
                         leases.add(ip)
@@ -283,12 +279,13 @@ class ATAKHandler:
             if non_wifi_nodes:
                 # Write to pending directory
                 timestamp = str(int(time.time() * 1000))
-                path = f"{self.pending_dir}/packet_{timestamp}.zst"
+                filename = f"packet_{timestamp}.zst"
+                path = f"{self.pending_dir}/{filename}"
                 
                 with open(path, 'wb') as f:
                     f.write(compressed)
                 if src_port:
-                    print(f"ATAK to LoRa: From port {src_port} -> {path}")
+                    print(f"ATAK to LoRa: From port {src_port} -> {filename}")
             else:
                 # Clean up directories if all nodes in WIFI mode
                 self.cleanup_shared_directories()
@@ -345,8 +342,8 @@ class ATAKHandler:
                     try:
                         data, src = sock.recvfrom(65535)
                         ip_type = self.check_ip_location(src[0])
-                        print(f"UDP RECEIVE: Source IP {src[0]}:{src[1]} [{ip_type}] -> Listening on {addr}:{port} ({len(data)} bytes)")
                         if port in [17012, 6969] and ip_type == "LOCAL":
+                            print(f"UDP RECEIVE: From port {port} ({len(data)} bytes)")
                             self.process_packet(data, port)
                     except socket.timeout:
                         continue

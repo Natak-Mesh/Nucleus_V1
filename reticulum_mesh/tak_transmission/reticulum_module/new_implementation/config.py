@@ -39,6 +39,7 @@ RETRY_CHECK_INTERVAL = 1     # Check for pending retries every second
 LOG_LEVEL = "INFO"
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 PACKET_LOG_MAX_LINES = 100
+ERROR_LOG_RATE_LIMIT = 60  # Only log same error once per minute per node
 
 # Thread sleep intervals (in seconds)
 NODE_MONITOR_INTERVAL = 5    # Check node modes every 5 seconds

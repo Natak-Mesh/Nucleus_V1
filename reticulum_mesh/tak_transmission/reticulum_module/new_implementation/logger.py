@@ -6,9 +6,37 @@ Provides consistent logging across all components.
 """
 
 import os
+import time
 import logging
 from datetime import datetime
 import config
+
+class RateLimitedLogger:
+    """Logger wrapper that implements rate limiting per message"""
+    def __init__(self, logger):
+        self._logger = logger
+        self._last_log_time = {}  # message -> last log time
+    
+    def _should_log(self, message):
+        current_time = time.time()
+        if message not in self._last_log_time or \
+           current_time - self._last_log_time[message] >= config.ERROR_LOG_RATE_LIMIT:
+            self._last_log_time[message] = current_time
+            return True
+        return False
+    
+    def error(self, message):
+        if self._should_log(message):
+            self._logger.error(message)
+    
+    def info(self, message):
+        self._logger.info(message)
+    
+    def warning(self, message):
+        self._logger.warning(message)
+    
+    def debug(self, message):
+        self._logger.debug(message)
 
 class RotatingHandler(logging.FileHandler):
     """Custom file handler that maintains last N lines"""
@@ -78,4 +106,5 @@ def setup_logger(name, log_file=None, level=None):
 
 def get_logger(component_name, log_file=None):
     """Get a configured logger for a component"""
-    return setup_logger(component_name, log_file)
+    logger = setup_logger(component_name, log_file)
+    return RateLimitedLogger(logger)

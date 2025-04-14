@@ -2,6 +2,7 @@
 
 import json
 import os
+import socket
 import subprocess
 import time
 from datetime import datetime
@@ -12,9 +13,6 @@ class EnhancedOGMMonitor:
     FAILURE_COUNT = 3          # consecutive failures to switch to LORA
     RECOVERY_COUNT = 10        # consecutive good readings to switch back to WIFI
     
-    # Local node information - exclude from monitoring
-    LOCAL_NODE_MAC = "00:c0:ca:b6:92:c0"  # takNode1
-    
     # File paths
     HOSTNAME_MAP_PATH = "/home/natak/mesh/hostname_mapping.json"
     STATUS_FILE_PATH = "/home/natak/reticulum_mesh/ogm_monitor/node_status.json"
@@ -24,6 +22,11 @@ class EnhancedOGMMonitor:
         # Set up logging
         self.setup_logging()
         
+        # Get local MAC address
+        self.local_mac = self.get_local_mac()
+        if not self.local_mac:
+            self.logger.error("Could not determine local MAC address")
+        
         # Initialize nodes status tracking
         self.node_status = {}
         
@@ -32,6 +35,19 @@ class EnhancedOGMMonitor:
         self.logger.info(f"Writing status to: {self.STATUS_FILE_PATH}")
         self.logger.info("\nMonitoring mesh status (Press Ctrl+C to exit)...")
         
+    def get_local_mac(self):
+        """Get local MAC address from hostname mapping"""
+        try:
+            hostname = socket.gethostname()
+            hostname_mapping = self.load_hostname_mapping()
+            for mac, node_info in hostname_mapping.items():
+                if node_info.get("hostname") == hostname:
+                    return mac
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting local MAC: {e}")
+            return None
+            
     def setup_logging(self):
         """Set up basic console logging"""
         import logging
@@ -81,7 +97,7 @@ class EnhancedOGMMonitor:
                     mac = parts[1]  # MAC address after *
                     
                     # Skip local node
-                    if mac == self.LOCAL_NODE_MAC:
+                    if mac == self.local_mac:
                         continue
                     
                     # Extract last_seen (remove 's' suffix)
@@ -133,7 +149,7 @@ class EnhancedOGMMonitor:
         # Process all nodes from hostname mapping (except local node)
         for mac, node_info in hostname_nodes.items():
             # Skip local node
-            if mac == self.LOCAL_NODE_MAC:
+            if mac == self.local_mac:
                 continue
                 
             # Start with hostname mapping information

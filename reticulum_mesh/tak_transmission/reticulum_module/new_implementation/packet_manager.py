@@ -18,8 +18,8 @@ import os
 import json
 import time
 import RNS
-from . import config
-from . import logger
+import config
+import logger
 
 class PacketManager:
     def __init__(self, peer_discovery=None):
@@ -66,9 +66,17 @@ class PacketManager:
 
             # Process each file in delivery status
             for filename, status in list(self.delivery_status.items()):
-                # Skip if max retries reached
+                # Clean up if max retries reached
                 if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
                     self.logger.warning(f"Max retries reached for {filename}")
+                    # Clean up the failed packet
+                    sent_path = os.path.join(self.sent_buffer, filename)
+                    try:
+                        os.remove(sent_path)
+                        del self.delivery_status[filename]
+                        self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
+                    except Exception as e:
+                        self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
                     continue
 
                 # Calculate backoff delay
@@ -81,10 +89,10 @@ class PacketManager:
                 if current_time - status["last_retry"] < delay:
                     continue
 
-                # Get nodes that need retry (failed and still in LORA mode)
+                # Get nodes that need retry (failed, in LORA mode, and have identity)
                 retry_nodes = [
                     node for node in lora_nodes
-                    if node in status["nodes"] and not status["nodes"][node]
+                    if node in status["nodes"] and not status["nodes"][node] and self.peer_discovery.get_peer_identity(node)
                 ]
 
                 if retry_nodes:
@@ -100,9 +108,12 @@ class PacketManager:
                     # Retry sending to each failed node
                     for node in retry_nodes:
                         try:
-                            self.send_to_node(node, data, filename)
+                            if self.peer_discovery:  # Only try if peer_discovery exists
+                                self.logger.info(f"Retrying {filename} to {node} (retry #{status['retry_count'] + 1})")
+                                self.send_to_node(node, data, filename)
                         except Exception as e:
                             self.logger.error(f"Error retrying {filename} to {node}: {e}")
+                            continue  # Continue to next node even if this one fails
 
                     # Update retry tracking
                     status["retry_count"] += 1
@@ -134,21 +145,24 @@ class PacketManager:
             with open(pending_path, 'rb') as f:
                 data = f.read()
 
-            # Initialize delivery tracking
+            # Initialize delivery tracking - only for nodes we have identities for
             filename = os.path.basename(pending_path)
+            valid_nodes = [node for node in lora_nodes if self.peer_discovery.get_peer_identity(node)]
             self.delivery_status[filename] = {
-                "nodes": {node: False for node in lora_nodes},
+                "nodes": {node: False for node in valid_nodes},
                 "first_sent": time.time(),
                 "last_retry": time.time(),
                 "retry_count": 0
             }
 
-            # Send to each LORA node
-            for node in lora_nodes:
+            # Send to each valid node
+            for node in valid_nodes:
                 try:
-                    self.send_to_node(node, data, filename)
+                    if self.peer_discovery:  # Only try if peer_discovery exists
+                        self.send_to_node(node, data, filename)
                 except Exception as e:
                     self.logger.error(f"Error sending to {node}: {e}")
+                    continue  # Continue to next node even if this one fails
 
             # Move to sent buffer
             os.rename(pending_path, sent_path)
@@ -196,16 +210,31 @@ class PacketManager:
             receipt.set_timeout(config.PACKET_TIMEOUT)
 
             def on_delivery(r):
-                self.logger.info(f"Packet delivered to {hostname}")
-                if filename in self.delivery_status:
-                    self.delivery_status[filename]["nodes"][hostname] = True
-                    # Check if all nodes received
-                    if all(self.delivery_status[filename]["nodes"].values()):
-                        self.logger.info(f"All nodes received {filename}")
-                        # Could remove from sent_buffer here, but leaving for manual handling
+                if r.get_status() == RNS.PacketReceipt.DELIVERED:
+                    rtt = r.get_rtt()
+                    if rtt >= 1:
+                        rtt = round(rtt, 3)
+                        rtt_str = f"{rtt} seconds"
+                    else:
+                        rtt = round(rtt * 1000, 3)
+                        rtt_str = f"{rtt} milliseconds"
+                        
+                    self.logger.info(f"Packet {filename} delivered to {hostname} (RTT: {rtt_str})")
+                    if filename in self.delivery_status:
+                        self.delivery_status[filename]["nodes"][hostname] = True
+                        # Check if all nodes received
+                        if all(self.delivery_status[filename]["nodes"].values()):
+                            # Remove file from sent buffer
+                            sent_path = os.path.join(self.sent_buffer, filename)
+                            try:
+                                os.remove(sent_path)
+                                del self.delivery_status[filename]
+                                self.logger.info(f"All nodes received {filename} - removed from sent buffer")
+                            except Exception as e:
+                                self.logger.error(f"Error removing {filename} from sent buffer: {e}")
 
             def on_timeout(r):
-                self.logger.warning(f"Packet to {hostname} timed out")
+                self.logger.warning(f"Packet {filename} to {hostname} timed out")
                 if filename in self.delivery_status:
                     self.delivery_status[filename]["nodes"][hostname] = False
 
@@ -235,3 +264,7 @@ class PacketManager:
     def stop(self):
         """Stop the packet manager"""
         self.should_quit = True
+
+if __name__ == "__main__":
+    manager = PacketManager()
+    manager.run()
