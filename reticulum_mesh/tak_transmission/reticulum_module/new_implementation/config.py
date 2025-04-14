@@ -42,3 +42,6 @@ PACKET_LOG_MAX_LINES = 100
 
 # Thread sleep intervals (in seconds)
 NODE_MONITOR_INTERVAL = 5    # Check node modes every 5 seconds
+
+# Packet configuration
+PACKET_TIMEOUT = 300  # Time in seconds to wait for delivery proof

@@ -6,108 +6,121 @@ The Packet Handler is responsible for managing packet transmission between nodes
 1. **Outgoing Loop**: Monitors pending packets and manages their transmission to LORA nodes
 2. **Incoming Loop**: Receives and processes incoming packets from the mesh network
 
-## Directory Structure
-```
-/home/natak/reticulum_mesh/tak_transmission/shared/
-├── pending/         # New packets awaiting transmission
-├── sent_buffer/     # Successfully transmitted packets
-└── incoming/        # Received packets from other nodes
-```
+## Critical Implementation Notes
 
-## Outgoing Loop
+### Pure Transport Layer
+- **NO PACKET MODIFICATION**: This is a critical requirement. The packet handler ONLY moves files between directories and sends them via Reticulum. It NEVER modifies packet contents.
+- **Sequential Processing**: Due to LORA radio constraints, all operations are sequential. There is no concurrent processing.
+- **Directory Operations**: Only performs move operations between directories:
+  * `/pending` → `/sent_buffer` (after sending)
+  * `/incoming` ← received packets
 
-### Functionality
-- Monitors `/pending` directory for new packets
-- Reads `node_status.json` to identify LORA mode nodes
-- Transmits packets to each LORA node with delivery proof requirement
-- Moves processed packets to `/sent_buffer`
-- Tracks packet delivery status and proofs
+### Reticulum Integration
+- Uses peer_discovery's 'IN' destination for receiving packets
+- Creates RNS.Packet instances for sending with delivery proofs
+- Leverages Reticulum's built-in proof system:
+  ```python
+  # Example packet sending with proof tracking
+  packet = RNS.Packet(destination, data)
+  receipt = packet.send()
+  receipt.set_delivery_callback(on_delivery)
+  receipt.set_timeout_callback(on_timeout)
+  ```
 
-### Packet Tracking
+### Core Components
+
+1. **Packet Monitoring**
+   - Monitors `/pending` directory for new files
+   - Processes one packet at a time (sequential)
+   - Moves processed packets to `/sent_buffer`
+   - Moves received packets to `/incoming`
+
+2. **Node Status**
+   - Reads node_status.json to identify LORA nodes
+   - Only sends packets to nodes in LORA mode
+   - No peer tracking (handled by peer_discovery)
+
+3. **Delivery Handling**
+   - Uses Reticulum's built-in proof system with callbacks
+   - Tracks delivery status per file and per node
+   - Maintains state of which nodes have confirmed receipt
+   - Automatic retry system for failed deliveries
+   - Removes from tracking when all nodes confirm
+
+### Configuration
 ```python
-{
-    "packet_name": {
-        "timestamp": sent_time,
-        "nodes": {
-            "node1": {"status": "pending", "attempts": 1},
-            "node2": {"status": "delivered", "proof_time": time}
-        }
-    }
-}
+# Required config.py settings
+PACKET_TIMEOUT = 300      # Time in seconds to wait for delivery proof
+RETRY_MAX_ATTEMPTS = 5    # Max retry attempts per node
+RETRY_INITIAL_DELAY = 10  # Base delay for first retry
+RETRY_BACKOFF_FACTOR = 2  # Multiplier for delay increase
+RETRY_MAX_DELAY = 120     # Maximum delay between retries
 ```
 
-### Delivery States
-- **Pending**: Initial state after sending to node
-- **Delivered**: Proof of delivery received
-- **Failed**: No proof received within timeout period
-
-### Timeout Handling
-- Uses `RETRY_*` configurations from `config.py`
-- Initial delay: 10 seconds
-- Backoff factor: 2 (doubles each retry)
-- Maximum delay: 120 seconds
-- Maximum attempts: 5
-- Rate limit: 1 retry per second
-
-### Failure Handling
-When a packet fails to deliver (no proof received within timeout):
-1. Packet remains in tracking dictionary with "failed" status
-2. Failed delivery is logged for monitoring
-3. Packet remains in sent_buffer for manual inspection
-4. System continues monitoring for late proofs
-
-## Incoming Loop
-
-### Functionality
-- Listens for incoming packets over Reticulum
-- Moves received packets directly to `/incoming` directory
-- Maintains packet integrity (no modifications)
-- Operates independently of outgoing loop
-
-### Critical Requirements
-- **No Packet Modification**: Incoming packets must be stored exactly as received
-- **Immediate Processing**: Packets should be moved to incoming directory without delay
-- **Error Handling**: Any receive errors should be logged but not impact continuous operation
+### Error Handling
+- Failed packet deliveries logged but do not stop processing
+- No packet modification on errors
+- Failed deliveries tracked per node for retry
+- Exponential backoff for retries
+- Max retry attempts enforced per node
 
 ## Implementation Notes
 
-### Key Classes
-1. **DirectoryMonitor**
-   - Watches `/pending` directory for new files
-   - Triggers packet processing workflow
+### Outgoing Flow
+1. Monitor `/pending` directory for new files
+2. When file found, read node_status.json for LORA nodes
+3. For each LORA node:
+   - Create RNS.Packet with delivery proof
+   - Send packet and track receipt
+   - Move to sent_buffer after sending
+   - Initialize delivery tracking for each node
+   - Track delivery status per node
+   - Retry failed nodes with exponential backoff
+   - Remove tracking when all nodes confirm
 
-2. **PacketTracker**
-   - Manages delivery status dictionary
-   - Handles proof updates
-   - Monitors timeouts
+### Incoming Flow
+1. Listen on peer_discovery's IN destination
+2. When packet received:
+   - Move directly to incoming directory
+   - No modification of packet contents
+   - No acknowledgment handling (done by Reticulum)
 
-3. **ProofHandler**
-   - Processes delivery proofs
-   - Updates tracking status
-   - Triggers cleanup of successful deliveries
+### Error Handling
+1. Failed Sends:
+   - Log error
+   - Mark node as failed in delivery tracking
+   - Keep packet in sent_buffer
+   - Retry based on backoff schedule
+   - Continue with next packet
 
-### Configuration Requirements
-```python
-# Add to config.py:
-PACKET_TIMEOUT = 300  # 5 minutes to receive proof
-TRACKING_FILE = "packet_tracking.json"  # For persistence
-```
+2. Failed Receives:
+   - Log error
+   - Continue with next packet
+   - No retry needed (handled by Reticulum)
 
-### Monitoring & Logging
-- All packet movements logged with timestamps
-- Delivery statistics tracked (success/failure rates)
-- Node-specific performance metrics
-- Proof receipt timing data
+### Key Differences from Old Implementation
+1. No peer tracking (handled by peer_discovery)
+2. No threading/concurrency
+3. Simplified error handling
+4. Uses Reticulum's built-in proof system
+5. Strict no-modification policy for packets
+6. Sequential processing only
 
-## Future Considerations
+## Integration Points
 
-### Potential Enhancements
-1. Automated cleanup of old successful deliveries
-2. Performance optimization for high packet volumes
-3. Advanced retry strategies based on node performance
-4. Real-time monitoring dashboard
+1. **File System**
+   - `/pending`: Watch for new files
+   - `/sent_buffer`: Store sent files
+   - `/incoming`: Store received files
+   - `node_status.json`: Read LORA node list
 
-### Integration Points
-- Node status monitoring
-- Network performance metrics
-- System health monitoring
+2. **Reticulum**
+   - Uses peer_discovery's IN destination
+   - Uses RNS.Packet for sending
+   - Uses built-in proof system
+
+3. **Logging**
+   - File movements
+   - Delivery status
+   - Errors
+   - No performance metrics needed

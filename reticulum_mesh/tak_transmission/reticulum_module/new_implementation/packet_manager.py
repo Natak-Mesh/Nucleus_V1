@@ -14,6 +14,9 @@
 ##############################################################################
 """
 
+import os
+import json
+import time
 import RNS
 from . import config
 from . import logger
@@ -22,16 +25,160 @@ class PacketManager:
     def __init__(self, peer_discovery=None):
         self.peer_discovery = peer_discovery
         self.logger = logger.get_logger("PacketManager")
+        
+        # Directory paths
+        self.pending_dir = config.PENDING_DIR
+        self.sent_buffer = config.SENT_BUFFER_DIR
+        self.incoming_dir = config.INCOMING_DIR
+        
+        # Monitoring state
+        self.should_quit = False
 
-    def send_data(self, hostname, data):
-        """Send data to a specific hostname"""
+        # Delivery tracking
+        self.delivery_status = {}  # filename -> {nodes: {hostname: delivered}, first_sent: time, last_retry: time, retry_count: int}
+        
+        # Ensure directories exist
+        os.makedirs(self.pending_dir, exist_ok=True)
+        os.makedirs(self.sent_buffer, exist_ok=True)
+        os.makedirs(self.incoming_dir, exist_ok=True)
+
+        # Set up packet callback on peer_discovery's destination
+        if self.peer_discovery and self.peer_discovery.destination:
+            self.peer_discovery.destination.set_packet_callback(self.handle_incoming_packet)
+            self.peer_discovery.destination.set_proof_strategy(RNS.Destination.PROVE_ALL)
+
+    def run(self):
+        """Main loop - process outgoing and handle incoming"""
+        self.logger.info("PacketManager running")
+        while not self.should_quit:
+            try:
+                self.process_outgoing()
+                self.process_retries()
+                time.sleep(1)
+            except Exception as e:
+                self.logger.error(f"Error in main loop: {e}")
+
+    def process_retries(self):
+        """Check sent_buffer for failed deliveries and retry if needed"""
+        try:
+            current_time = time.time()
+            lora_nodes = self.get_lora_nodes()
+
+            # Process each file in delivery status
+            for filename, status in list(self.delivery_status.items()):
+                # Skip if max retries reached
+                if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
+                    self.logger.warning(f"Max retries reached for {filename}")
+                    continue
+
+                # Calculate backoff delay
+                delay = min(
+                    config.RETRY_INITIAL_DELAY * (config.RETRY_BACKOFF_FACTOR ** status["retry_count"]),
+                    config.RETRY_MAX_DELAY
+                )
+
+                # Check if enough time has passed since last retry
+                if current_time - status["last_retry"] < delay:
+                    continue
+
+                # Get nodes that need retry (failed and still in LORA mode)
+                retry_nodes = [
+                    node for node in lora_nodes
+                    if node in status["nodes"] and not status["nodes"][node]
+                ]
+
+                if retry_nodes:
+                    # Read file data
+                    file_path = os.path.join(self.sent_buffer, filename)
+                    try:
+                        with open(file_path, 'rb') as f:
+                            data = f.read()
+                    except Exception as e:
+                        self.logger.error(f"Error reading {filename} for retry: {e}")
+                        continue
+
+                    # Retry sending to each failed node
+                    for node in retry_nodes:
+                        try:
+                            self.send_to_node(node, data, filename)
+                        except Exception as e:
+                            self.logger.error(f"Error retrying {filename} to {node}: {e}")
+
+                    # Update retry tracking
+                    status["retry_count"] += 1
+                    status["last_retry"] = current_time
+
+        except Exception as e:
+            self.logger.error(f"Error processing retries: {e}")
+
+    def process_outgoing(self):
+        """Process files in pending directory"""
+        try:
+            # Get list of files in pending
+            pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
+            if not pending_files:
+                return
+
+            # Get LORA nodes from node_status.json
+            lora_nodes = self.get_lora_nodes()
+            if not lora_nodes:
+                return
+
+            # Process oldest file first
+            pending_files.sort()
+            filename = pending_files[0]
+            pending_path = os.path.join(self.pending_dir, filename)
+            sent_path = os.path.join(self.sent_buffer, filename)
+
+            # Read file data
+            with open(pending_path, 'rb') as f:
+                data = f.read()
+
+            # Initialize delivery tracking
+            filename = os.path.basename(pending_path)
+            self.delivery_status[filename] = {
+                "nodes": {node: False for node in lora_nodes},
+                "first_sent": time.time(),
+                "last_retry": time.time(),
+                "retry_count": 0
+            }
+
+            # Send to each LORA node
+            for node in lora_nodes:
+                try:
+                    self.send_to_node(node, data, filename)
+                except Exception as e:
+                    self.logger.error(f"Error sending to {node}: {e}")
+
+            # Move to sent buffer
+            os.rename(pending_path, sent_path)
+
+        except Exception as e:
+            self.logger.error(f"Error processing outgoing: {e}")
+
+    def get_lora_nodes(self):
+        """Get list of nodes in LORA mode"""
+        try:
+            with open(config.NODE_STATUS_PATH, 'r') as f:
+                status = json.load(f)
+                return [
+                    node["hostname"] 
+                    for node in status.get("nodes", {}).values()
+                    if node.get("mode") == "LORA"
+                ]
+        except Exception as e:
+            self.logger.error(f"Error reading node_status.json: {e}")
+            return []
+
+    def send_to_node(self, hostname, data, filename):
+        """Send data to a specific node"""
         # Get peer identity from peer_discovery
         peer_identity = self.peer_discovery.get_peer_identity(hostname)
         if not peer_identity:
-            self.logger.error(f"Cannot send data: No identity found for {hostname}")
+            self.logger.error(f"No identity found for {hostname}")
             return False
 
-        # Create outbound destination for this peer
+        # Create outbound destination
         destination = RNS.Destination(
             peer_identity,
             RNS.Destination.OUT,
@@ -40,15 +187,51 @@ class PacketManager:
             config.ASPECT
         )
 
-        # Create and send packet
+        # Create and send packet with proof tracking
         packet = RNS.Packet(destination, data)
-        success = packet.send()
+        receipt = packet.send()
 
-        if success:
-            # Set up basic retry on failure
-            packet.set_delivery_callback(lambda r: self.logger.info(f"Packet delivered to {hostname}"))
-            packet.set_timeout_callback(lambda r: self.logger.warning(f"Packet to {hostname} failed, should retry"))
+        if receipt:
+            # Set timeout and callbacks
+            receipt.set_timeout(config.PACKET_TIMEOUT)
+
+            def on_delivery(r):
+                self.logger.info(f"Packet delivered to {hostname}")
+                if filename in self.delivery_status:
+                    self.delivery_status[filename]["nodes"][hostname] = True
+                    # Check if all nodes received
+                    if all(self.delivery_status[filename]["nodes"].values()):
+                        self.logger.info(f"All nodes received {filename}")
+                        # Could remove from sent_buffer here, but leaving for manual handling
+
+            def on_timeout(r):
+                self.logger.warning(f"Packet to {hostname} timed out")
+                if filename in self.delivery_status:
+                    self.delivery_status[filename]["nodes"][hostname] = False
+
+            receipt.set_delivery_callback(on_delivery)
+            receipt.set_timeout_callback(on_timeout)
             return True
 
         self.logger.error(f"Failed to send packet to {hostname}")
         return False
+
+    def handle_incoming_packet(self, data, packet):
+        """Handle incoming packets by moving to incoming directory"""
+        try:
+            # Generate unique filename with timestamp
+            timestamp = int(time.time())
+            filename = f"incoming_{timestamp}.zst"
+            file_path = os.path.join(self.incoming_dir, filename)
+            
+            # Write data to file
+            with open(file_path, 'wb') as f:
+                f.write(data)
+                
+            self.logger.info(f"Received packet, saved to {filename}")
+        except Exception as e:
+            self.logger.error(f"Error handling incoming packet: {e}")
+
+    def stop(self):
+        """Stop the packet manager"""
+        self.should_quit = True
