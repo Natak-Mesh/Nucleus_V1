@@ -1,9 +1,9 @@
 {
-  "timestamp": 1744671876,
+  "timestamp": 1744676072,
   "peers": {
     "takNode2": {
-      "destination_hash": "45ac2965273bcbcd8d9bb91631151725",
-      "last_seen": 1744671876
+      "destination_hash": "d8685a2721232c78cc56932dfabb57ae",
+      "last_seen": 1744676072
     }
   }
 }
