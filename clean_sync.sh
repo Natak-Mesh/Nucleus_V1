@@ -36,6 +36,7 @@ cp -v /home/natak/mesh/README.md "$CLEAN_REPO_DIR/home/natak/mesh/"
 
 # Copy systemd service files
 cp -v /etc/systemd/system/mesh-startup.service "$CLEAN_REPO_DIR/etc/systemd/system/"
+cp -v /etc/systemd/system/reticulum-stack.service "$CLEAN_REPO_DIR/etc/systemd/system/"
 #cp -v /etc/systemd/system/reticulum-mesh-identity.service "$CLEAN_REPO_DIR/etc/systemd/system/"
 #cp -v /etc/systemd/system/reticulum-mesh-network.service "$CLEAN_REPO_DIR/etc/systemd/system/"
 #cp -v /etc/systemd/system/reticulum-mesh-ogm.service "$CLEAN_REPO_DIR/etc/systemd/system/"
@@ -118,6 +119,8 @@ cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implement
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/test_peer_discovery.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.json "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/packet_handler_README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/test_setup.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/start_reticulum_stack.sh "$CLEAN_REPO_DIR/reticulum_mesh/"
 
 # Create .gitkeep files for empty directories
 touch "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/pending/.gitkeep"

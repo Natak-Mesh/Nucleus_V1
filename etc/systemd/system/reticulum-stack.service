@@ -1,0 +1,15 @@
+[Unit]
+Description=Reticulum Stack Service
+After=mesh-startup.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=natak
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/natak/reticulum_mesh/start_reticulum_stack.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
