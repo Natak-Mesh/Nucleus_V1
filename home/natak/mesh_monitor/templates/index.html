@@ -2,583 +2,117 @@
 <html>
 <head>
     <title>Mesh Monitor</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="refresh" content="5">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
-            --primary-color: #007bff;
-            --background-color: #f0f2f5;
-            --card-background: #ffffff;
-            --text-primary: #333333;
-            --text-secondary: #666666;
-            --danger-color: #ff4500;
-            --warning-bg: #fff3cd;
-            --warning-text: #856404;
-            --shadow-color: rgba(0,0,0,0.1);
-            --warning-bg-light: rgba(255, 69, 0, 0.05);
-            --warning-border: rgba(255, 69, 0, 0.2);
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --background-color: #1a1a1a;
-                --card-background: #2d2d2d;
-                --text-primary: #ffffff;
-                --text-secondary: #cccccc;
-                --shadow-color: rgba(0,0,0,0.3);
-            --warning-bg-light: rgba(255, 69, 0, 0.1);
-            --warning-border: rgba(255, 69, 0, 0.3);
-            }
+            --background-color: #1a1a1a;
+            --text-color: #ffffff;
+            --card-background: #2d2d2d;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: monospace;
             margin: 0;
-            padding: 0;
+            padding: 16px;
             background-color: var(--background-color);
-            color: var(--text-primary);
-            -webkit-tap-highlight-color: transparent;
-        }
-        .status-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: var(--card-background);
-            padding: 12px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            z-index: 100;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            color: var(--text-color);
         }
 
-        .connection-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-        }
-
-        .connection-indicator.online {
-            background-color: #4caf50;
-        }
-
-        .connection-indicator.offline {
-            background-color: var(--danger-color);
-        }
-
-        .header {
-            margin-top: 56px;
+        .section {
+            background-color: var(--card-background);
             padding: 16px;
-            background: var(--card-background);
-            box-shadow: 0 2px 4px var(--shadow-color);
-        }
-
-        .local-info {
-            margin: 10px 0;
-        }
-
-        .quick-stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            padding: 8px;
-        }
-
-        .stat-item {
-            background: var(--card-background);
-            padding: 12px;
             border-radius: 8px;
-            text-align: center;
+            margin-bottom: 24px;
         }
 
-        .content {
-            padding: 16px;
-            margin-bottom: 80px;
-        }
-
-        .node-cards {
-            display: flex;
-            flex-direction: column;
+        .node-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 16px;
-            margin-bottom: 32px;
         }
 
         .node-card {
-            background-color: var(--card-background);
-            border-radius: 12px;
+            background-color: var(--background-color);
             padding: 16px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            transition: all 0.2s ease;
-        }
-
-        .node-card.high-latency {
-            background-color: var(--warning-bg-light);
-            border: 1px solid var(--warning-border);
-        }
-
-        .node-card.expanded {
-            transform: scale(1.02);
-        }
-
-        .reticulum-card {
-            background-color: var(--card-background);
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            border-left: 4px solid var(--primary-color);
-            margin-bottom: 16px;
-        }
-        .info-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--shadow-color);
-        }
-
-        .info-item:last-child {
-            border-bottom: none;
-        }
-
-        .label {
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .value {
-            color: var(--text-primary);
-        }
-
-        .error-message {
-            color: var(--danger-color);
-            text-align: center;
-            padding: 20px;
-            background: var(--card-background);
-            border-radius: 8px;
-            margin: 16px;
-        }
-
-        .high-latency {
-            color: var(--danger-color);
-            font-weight: 500;
-        }
-
-        .warning {
-            background-color: var(--warning-bg);
-            color: var(--warning-text);
-            padding: 4px 8px;
             border-radius: 4px;
-            font-size: 0.8em;
-            margin-left: 8px;
         }
 
-        h3 {
-            color: var(--text-secondary);
-            margin: 24px 0 16px 0;
-            font-size: 1.1em;
+        .mode-wifi {
+            color: #4caf50;
         }
 
-        .force-announce-btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 24px;
-            margin: 16px 0;
-            cursor: pointer;
-            font-weight: 500;
-            width: 100%;
-            transition: background-color 0.2s;
+        .mode-lora {
+            color: #ff9800;
         }
 
-        .force-announce-btn:active {
-            transform: scale(0.98);
+        .peer-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
         }
 
-        .stale {
-            border-left: 4px solid var(--danger-color);
+        .peer-card {
+            background-color: var(--background-color);
+            padding: 16px;
+            border-radius: 4px;
         }
 
-        .stale-text {
-            color: var(--danger-color);
-        }
-        
-        /* Link event styles */
-        .link-established {
-            border-left: 4px solid #4caf50; /* Green */
-        }
-        
-        .link-closed {
-            border-left: 4px solid #ff9800; /* Orange */
-        }
-        
-        .link-card {
-            border-left: 4px solid #2196F3; /* Blue */
+        h1, h2 {
+            margin-top: 0;
         }
 
-        /* Pull to refresh styles */
-        .ptr-element {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            color: var(--text-secondary);
-            text-align: center;
-            transform: translate3d(0, -100%, 0);
+        a {
+            color: inherit;
+            text-decoration: none;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .stats {
+            font-size: 14px;
+            margin: 8px 0;
         }
     </style>
 </head>
 <body>
-    <div class="status-bar">
-        <div>
-            <span class="connection-indicator online" id="connectionStatus"></span>
-            <span id="lastUpdate">Updated: Just now</span>
-        </div>
-        <div>
-            <a href="/packet-logs" style="color: var(--primary-color); text-decoration: none; margin-right: 8px;">Packet Logs</a>
-            | {{ hostname }}
-        </div>
-    </div>
+    <h1>{{ hostname }}</h1>
+    <a href="/packet-logs">View Packet Logs →</a>
 
-    <div class="header">
-        <div class="quick-stats">
-            <div class="stat-item">
-                <div class="label">WLAN MAC</div>
-                <div class="value" id="wlanMac">-</div>
+    <div class="section">
+        <h2>BATMAN Mesh Status</h2>
+        <div class="node-grid">
+            {% for mac, node in node_status.items() %}
+            <div class="node-card">
+                <h3>{{ node.hostname }}</h3>
+                <div class="stats">IP: {{ node.ip }}</div>
+                <div class="stats">MAC: {{ mac }}</div>
+                <div class="stats">Mode: <span class="mode-{{ node.mode.lower() }}">{{ node.mode }}</span></div>
+                <div class="stats">Last Seen: {{ "%.2f"|format(node.last_seen) }}s</div>
+                <div class="stats">Throughput: {{ "%.1f"|format(node.throughput) }}</div>
+                <div class="stats">Next Hop: {{ node.nexthop }}</div>
+                <div class="stats">Failure Count: {{ node.failure_count }}</div>
+                <div class="stats">Good Count: {{ node.good_count }}</div>
             </div>
-            <div class="stat-item">
-                <div class="label">IP Address</div>
-                <div class="value" id="localIp">-</div>
-            </div>
-            <div class="stat-item">
-                <div class="label">Connected Nodes</div>
-                <div class="value" id="nodeCount">-</div>
-            </div>
-            <div class="stat-item">
-                <button id="wifiToggle" class="wifi-toggle" onclick="toggleWifi()">Deactivate WiFi</button>
-            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <style>
-        .wifi-toggle {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-weight: 500;
-            width: 100%;
-            transition: background-color 0.2s;
-        }
-        .wifi-toggle.off {
-            background-color: var(--danger-color);
-        }
-    </style>
-
-    <script>
-        async function checkWifiStatus() {
-            try {
-                const response = await fetch('/wifi/status');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateWifiButton(data.state);
-                }
-            } catch (error) {
-                console.error('Error checking WiFi status:', error);
-            }
-        }
-        
-        function updateWifiButton(state) {
-            const btn = document.getElementById('wifiToggle');
-            btn.textContent = state === 'up' ? 'Deactivate WiFi' : 'Activate WiFi';
-            btn.classList.toggle('off', state === 'down');
-        }
-        
-        async function toggleWifi() {
-            try {
-                const response = await fetch('/wifi/toggle', {
-                    method: 'POST'
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateWifiButton(data.state);
-                }
-            } catch (error) {
-                console.error('Error toggling WiFi:', error);
-            }
-        }
-        
-        // Check WiFi status when page loads
-        document.addEventListener('DOMContentLoaded', checkWifiStatus);
-    </script>
-
-    <div class="content">
-        <div id="nodeContent"></div>
+    <div class="section">
+        <h2>Reticulum Peers</h2>
+        <div class="peer-list">
+            {% for name, peer in peer_discovery.items() %}
+            <div class="peer-card">
+                <h3>{{ name }}</h3>
+                <div class="stats">Destination Hash: {{ peer.destination_hash }}</div>
+                <div class="stats">Last Seen: {{ (peer.current_time - peer.last_seen)|int }} seconds ago</div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
-
-
-    <script>
-        let eventSource = null;
-
-        function connectEventSource() {
-            if (eventSource) {
-                eventSource.close();
-            }
-
-            eventSource = new EventSource('/events');
-            
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                if (data.success) {
-                    document.getElementById('wlanMac').textContent = data.local_info.wlan_mac;
-                    document.getElementById('localIp').textContent = data.local_info.ip;
-                    document.getElementById('nodeCount').textContent = data.nodes.length;
-                    displayMeshData(data.nodes, data.reticulum_peers, data.local_info, data.active_links, data.link_events);
-                    document.getElementById('lastUpdate').textContent = 
-                        `Updated: ${new Date().toLocaleTimeString()}`;
-                    document.getElementById('connectionStatus').className = 
-                        'connection-indicator online';
-                } else {
-                    document.getElementById('nodeContent').innerHTML = 
-                        `<div class="error-message">Error: ${data.error}</div>`;
-                }
-            };
-
-            eventSource.onerror = function() {
-                document.getElementById('connectionStatus').className = 
-                    'connection-indicator offline';
-                // Try to reconnect in 5 seconds
-                setTimeout(connectEventSource, 5000);
-            };
-        }
-
-        // Handle page visibility
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                eventSource?.close();
-            } else {
-                connectEventSource();
-            }
-        });
-
-        function displayMeshData(nodes, reticulumPeers, localInfo, activeLinks, linkEvents) {
-            let html = '';
-            
-            // Add Local Node Reticulum Info
-            html += `
-                <div class="reticulum-card">
-                    <div class="info-item">
-                        <span class="label">Local Node:</span>
-                        <span class="value">${localInfo.hostname}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Hash:</span>
-                        <span class="value">${localInfo.hash}</span>
-                    </div>
-                </div>
-            `;
-            
-            // Wi-Fi Connections
-            html += '<h3>Wi-Fi Connections</h3>';
-            html += '<div class="node-cards">';
-            nodes.forEach(node => {
-                const isHighLatency = node.last_seen > 20;
-                const cardId = `node-${node.mac.replace(/:/g, '')}`;
-                
-                html += `
-                    <div class="node-card ${isHighLatency ? 'high-latency' : ''}" id="${cardId}" onclick="toggleNodeDetails(this)">
-                        <div class="info-item">
-                            <span class="label">Hostname:</span>
-                            <span class="value">${node.hostname}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">MAC:</span>
-                            <span class="value">${node.mac}</span>
-                        </div>
-                        <div class="info-item details" style="display: none;">
-                            <span class="label">Next Hop:</span>
-                            <span class="value">${node.nexthop}</span>
-                        </div>
-                        <div class="info-item details" style="display: none;">
-                            <span class="label">IP:</span>
-                            <span class="value">${node.ip}</span>
-                        </div>
-                        <div class="info-item details" style="display: none;">
-                            <span class="label">Mode:</span>
-                            <span class="value">${node.mode || 'Unknown'}</span>
-                        </div>
-                        <div class="info-item details" style="display: none;">
-                            <span class="label">Throughput:</span>
-                            <span class="value">${node.throughput} Mbps</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">Last Seen:</span>
-                            <span class="value ${isHighLatency ? 'high-latency' : ''}">${node.last_seen.toFixed(2)}s
-                                ${isHighLatency ? '<span class="warning">High Latency</span>' : ''}
-                            </span>
-                        </div>
-                    </div>`;
-            });
-            html += '</div>';
-            
-            // Add Active Links section
-            html += '<h3>Active Reticulum Links</h3>';
-            
-            if (activeLinks && activeLinks.length > 0) {
-                html += '<div class="node-cards">';
-                activeLinks.forEach(link => {
-                    const directionIcon = link.direction === 'incoming' ? '←' : '→';
-                    html += `
-                        <div class="reticulum-card link-card">
-                            <div class="info-item">
-                                <span class="label">Hostname:</span>
-                                <span class="value">${link.hostname} ${directionIcon}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Status:</span>
-                                <span class="value">${link.status}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Established:</span>
-                                <span class="value">${link.established_at}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Last Activity:</span>
-                                <span class="value">${link.last_activity}</span>
-                            </div>
-                        </div>`;
-                });
-                html += '</div>';
-            } else {
-                html += '<div class="reticulum-card"><div class="info-item">No active links</div></div>';
-            }
-            
-            // Add Recent Link Events section
-            html += '<h3>Recent Link Events</h3>';
-            
-            if (linkEvents && linkEvents.length > 0) {
-                html += '<div class="node-cards">';
-                linkEvents.forEach(event => {
-                    let eventClass = '';
-                    let eventIcon = '';
-                    
-                    if (event.type === 'established') {
-                        eventClass = 'link-established';
-                        eventIcon = '🔗';
-                    } else if (event.type === 'closed') {
-                        eventClass = 'link-closed';
-                        eventIcon = '✂️';
-                    }
-                    
-                    let details = '';
-                    if (event.age) {
-                        details += `Age: ${event.age}`;
-                    }
-                    if (event.inactive) {
-                        details += details ? `, Inactive: ${event.inactive}` : `Inactive: ${event.inactive}`;
-                    }
-                    if (event.direction) {
-                        const dirIcon = event.direction === 'incoming' ? '←' : '→';
-                        details += details ? `, ${dirIcon}` : dirIcon;
-                    }
-                    
-                    html += `
-                        <div class="reticulum-card ${eventClass}">
-                            <div class="info-item">
-                                <span class="label">${eventIcon} ${event.type.charAt(0).toUpperCase() + event.type.slice(1)}:</span>
-                                <span class="value">${event.hostname}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Time:</span>
-                                <span class="value">${event.timestamp}</span>
-                            </div>
-                            ${details ? `<div class="info-item">
-                                <span class="label">Details:</span>
-                                <span class="value">${details}</span>
-                            </div>` : ''}
-                        </div>`;
-                });
-                html += '</div>';
-            } else {
-                html += '<div class="reticulum-card"><div class="info-item">No recent link events</div></div>';
-            }
-            
-            // Add Reticulum Peers section
-            html += '<h3>Reticulum Peers</h3>';
-            
-            if (Object.keys(reticulumPeers).length > 0) {
-                for (const [hash, hostname] of Object.entries(reticulumPeers)) {
-                    // Strip angle brackets from hash
-                    const cleanHash = hash.replace(/[<>]/g, '');
-                    html += `
-                        <div class="reticulum-card">
-                            <div class="info-item">
-                                <span class="label">Hostname:</span>
-                                <span class="value">${hostname.name || hostname}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Last Seen:</span>
-                                <span class="value">${formatTimeDiff(hostname.last_seen)}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Hash:</span>
-                                <span class="value">${cleanHash}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="label">Hops:</span>
-                                <span class="value">${hostname.hops !== undefined ? hostname.hops : 'N/A'}</span>
-                            </div>
-                        </div>`;
-                }
-            } else {
-                html += '<div class="reticulum-card"><div class="info-item">No peers found</div></div>';
-            }
-            
-            document.getElementById('nodeContent').innerHTML = html;
-        }
-
-        function toggleNodeDetails(card) {
-            const details = card.querySelectorAll('.details');
-            const isExpanded = card.classList.contains('expanded');
-            
-            card.classList.toggle('expanded');
-            details.forEach(detail => {
-                detail.style.display = isExpanded ? 'none' : 'flex';
-            });
-        }
-
-        // Copy to clipboard functionality
-        document.getElementById('wlanMac').addEventListener('click', function() {
-            navigator.clipboard.writeText(this.textContent)
-                .then(() => {
-                    const originalText = this.textContent;
-                    this.textContent = 'Copied!';
-                    setTimeout(() => this.textContent = originalText, 1000);
-                });
-        });
-
-        document.getElementById('localIp').addEventListener('click', function() {
-            navigator.clipboard.writeText(this.textContent)
-                .then(() => {
-                    const originalText = this.textContent;
-                    this.textContent = 'Copied!';
-                    setTimeout(() => this.textContent = originalText, 1000);
-                });
-        });
-
-        function formatTimeDiff(seconds) {
-            return `${seconds}s ago`;
-        }
-
-
-        // Initial connection
-        connectEventSource();
-    </script>
 </body>
 </html>
