@@ -2,54 +2,117 @@
 <html>
 <head>
     <title>Reticulum Packet Logs</title>
-    <meta http-equiv="refresh" content="5">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
             --background-color: #1a1a1a;
             --text-color: #ffffff;
             --card-background: #2d2d2d;
+            --udp-color: #4a9eff;
+            --atak-to-lora-color: #4caf50;
+            --lora-to-atak-color: #ff9800;
+            --received-color: #e040fb;
+            --delivered-color: #00bcd4;
+            --complete-color: #8bc34a;
+            --retry-color: #fdd835;
+            --default-color: #ffffff;
         }
 
         body {
             font-family: monospace;
             margin: 0;
-            padding: 16px;
+            padding: 1px;
             background-color: var(--background-color);
             color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         a {
             color: inherit;
             text-decoration: none;
-            margin-bottom: 16px;
+            margin-bottom: 4px;
             display: inline-block;
         }
 
         a:hover {
             text-decoration: underline;
         }
+
+        .header {
+            flex: 0 0 auto;
+        }
+
+        .logs {
+            flex: 1 1 auto;
+            margin-top: 1px;
+            font-family: monospace;
+            white-space: pre-line;
+            overflow-y: auto;
+            height: calc(100vh - 25px);
+            background: var(--card-background);
+            padding: 0;
+            border-radius: 4px;
+        }
+
+        .log-line {
+            margin: 0;
+            padding: 0;
+            font-size: 14px;
+            line-height: 1;
+            display: block;
+        }
+
+        .log-time {
+            color: #888;
+            margin-right: 8px;
+        }
+
+        .msg-udp { color: var(--udp-color); }
+        .msg-atak-to-lora { color: var(--atak-to-lora-color); }
+        .msg-lora-to-atak { color: var(--lora-to-atak-color); }
+        .msg-received { color: var(--received-color); }
+        .msg-delivered { color: var(--delivered-color); }
+        .msg-complete { color: var(--complete-color); }
+        .msg-retry { color: var(--retry-color); }
+        .msg-default { color: var(--default-color); }
     </style>
+    <script>
+        let refreshTimer;
+
+        function checkScroll() {
+            const logs = document.querySelector('.logs');
+            const atBottom = Math.abs(logs.scrollHeight - logs.clientHeight - logs.scrollTop) < 50;
+            
+            if (atBottom && !refreshTimer) {
+                refreshTimer = setInterval(() => location.reload(), 5000);
+            } else if (!atBottom && refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+
+        window.onload = function() {
+            const logs = document.querySelector('.logs');
+            logs.scrollTop = logs.scrollHeight;
+            logs.onscroll = checkScroll;
+            checkScroll();
+        }
+    </script>
 </head>
 <body>
-    <h1>{{ hostname }}</h1>
-    <a href="/">← Back to Monitor</a>
-    
+    <div class="header" style="margin:0;padding:0;line-height:1">
+        <small>{{ hostname }}</small>
+        <a href="/" style="margin:0 0 2px 8px">←</a>
+    </div>
     <div class="logs">
         {% for log in logs %}
-            <div class="log-line">{{ log }}</div>
+            <div class="log-line">
+                <span class="log-time">[{{ log.time }}]</span>
+                <span class="msg-{{ log.type }}">{{ log.message }}</span>
+            </div>
         {% endfor %}
     </div>
-
-    <style>
-        .logs {
-            margin-top: 20px;
-            font-family: monospace;
-            white-space: pre;
-        }
-        .log-line {
-            margin: 5px 0;
-        }
-    </style>
 </body>
 </html>

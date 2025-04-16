@@ -38,10 +38,51 @@ def home():
                          node_status=node_status,
                          peer_discovery=peer_discovery)
 
+def parse_log_line(line):
+    try:
+        # Extract timestamp and message
+        parts = line.split(" - ", 1)
+        if len(parts) != 2:
+            return None
+            
+        timestamp = parts[0].split()[1]  # Get HH:MM:SS
+        message = parts[1].strip()
+        
+        # Determine message type
+        msg_type = "default"
+        if "UDP RECEIVE:" in message:
+            msg_type = "udp"
+        elif "ATAK to LoRa:" in message:
+            msg_type = "atak-to-lora"
+        elif "LoRa to ATAK:" in message:
+            msg_type = "lora-to-atak"
+        elif "Received packet" in message:
+            msg_type = "received"
+        elif "delivered to" in message:
+            msg_type = "delivered"
+        elif "All nodes received" in message:
+            msg_type = "complete"
+        elif "Retrying packet" in message:
+            msg_type = "retry"
+            
+        return {
+            'time': timestamp,
+            'message': message,
+            'type': msg_type
+        }
+    except Exception:
+        return None
+
 def read_packet_logs():
     try:
         with open('/var/log/reticulum/packet_logs.log', 'r') as f:
-            return f.readlines()
+            lines = f.readlines()
+            logs = []
+            for line in lines:
+                parsed = parse_log_line(line)
+                if parsed:
+                    logs.append(parsed)
+            return logs
     except Exception as e:
         print(f"Error reading packet_logs.log: {e}")
         return []
