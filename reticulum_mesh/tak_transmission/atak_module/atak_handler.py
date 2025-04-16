@@ -197,14 +197,24 @@ class ATAKHandler:
         return False
     
     def get_non_wifi_nodes(self):
-        """Get list of nodes in LORA mode"""
+        """Get list of nodes that are in LORA mode and have peer discovery entries"""
         try:
+            # First get nodes in LORA mode
             with open(self.node_modes_path, 'r') as f:
                 status = json.load(f)
-                return [
+                lora_nodes = [
                     node["hostname"] 
                     for node in status.get("nodes", {}).values()
                     if node.get("mode") == "LORA"
+                ]
+            
+            # Then filter to only those with peer discovery entries
+            peer_discovery_path = "/home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.json"
+            with open(peer_discovery_path, 'r') as f:
+                peer_status = json.load(f)
+                return [
+                    node for node in lora_nodes
+                    if node in peer_status.get("peers", {})
                 ]
         except Exception:
             return []

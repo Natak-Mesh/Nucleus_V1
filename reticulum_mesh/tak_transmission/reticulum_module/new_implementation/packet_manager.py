@@ -171,17 +171,27 @@ class PacketManager:
             self.logger.error(f"Error processing outgoing: {e}")
 
     def get_lora_nodes(self):
-        """Get list of nodes in LORA mode"""
+        """Get list of nodes that are in LORA mode and have peer discovery entries"""
         try:
+            # First get nodes in LORA mode
             with open(config.NODE_STATUS_PATH, 'r') as f:
                 status = json.load(f)
-                return [
+                lora_nodes = [
                     node["hostname"] 
                     for node in status.get("nodes", {}).values()
                     if node.get("mode") == "LORA"
                 ]
+            
+            # Then filter to only those with peer discovery entries
+            peer_discovery_path = os.path.join(os.path.dirname(config.NODE_STATUS_PATH), "..", "tak_transmission/reticulum_module/new_implementation/peer_discovery.json")
+            with open(peer_discovery_path, 'r') as f:
+                peer_status = json.load(f)
+                return [
+                    node for node in lora_nodes
+                    if node in peer_status.get("peers", {})
+                ]
         except Exception as e:
-            self.logger.error(f"Error reading node_status.json: {e}")
+            self.logger.error(f"Error reading status files: {e}")
             return []
 
     def send_to_node(self, hostname, data, filename):
@@ -200,6 +210,9 @@ class PacketManager:
             config.APP_NAME,
             config.ASPECT
         )
+
+        # Add log message before sending
+        self.logger.info(f"Sending packet {filename} to node {hostname}")
 
         # Create and send packet with proof tracking
         packet = RNS.Packet(destination, data)
