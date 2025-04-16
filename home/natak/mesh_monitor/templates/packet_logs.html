@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Reticulum Packet Logs</title>
+    <meta http-equiv="refresh" content="5">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
@@ -33,5 +34,22 @@
 <body>
     <h1>{{ hostname }}</h1>
     <a href="/">← Back to Monitor</a>
+    
+    <div class="logs">
+        {% for log in logs %}
+            <div class="log-line">{{ log }}</div>
+        {% endfor %}
+    </div>
+
+    <style>
+        .logs {
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre;
+        }
+        .log-line {
+            margin: 5px 0;
+        }
+    </style>
 </body>
 </html>

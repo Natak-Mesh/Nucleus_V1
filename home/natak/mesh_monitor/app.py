@@ -38,9 +38,20 @@ def home():
                          node_status=node_status,
                          peer_discovery=peer_discovery)
 
+def read_packet_logs():
+    try:
+        with open('/var/log/reticulum/packet_logs.log', 'r') as f:
+            return f.readlines()
+    except Exception as e:
+        print(f"Error reading packet_logs.log: {e}")
+        return []
+
 @app.route('/packet-logs')
 def packet_logs():
-    return render_template('packet_logs.html', hostname=socket.gethostname())
+    logs = read_packet_logs()
+    return render_template('packet_logs.html', 
+                         hostname=socket.gethostname(),
+                         logs=logs)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

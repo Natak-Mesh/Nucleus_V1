@@ -12,6 +12,7 @@ import hashlib
 import threading
 import json
 import subprocess
+import logger
 from collections import deque
 from typing import Dict, Tuple
 from utils.compression import compress_cot_packet, decompress_cot_packet
@@ -104,6 +105,9 @@ LORA_OUT_PORTS = [17013, 6971]
 class ATAKHandler:
     def __init__(self, shared_dir: str = "/home/natak/reticulum_mesh/tak_transmission/shared"):
         """Initialize handler"""
+        # Set up logger
+        self.logger = logger.get_logger("ATAKHandler", "packet_logs.log")
+        
         # ATAK listening socket handling
         self.atak_listening_sockets: Dict[Tuple[str, int], socket.socket] = {}
         self.lock = threading.Lock()
@@ -239,7 +243,7 @@ class ATAKHandler:
                 if "(to" in line:
                     ip = line.strip().split("(to")[0].replace("Offered DHCP leases:", "").strip()
                     if ip and ":" not in ip:
-                        print(f"Found lease IP: {ip}")
+                        self.logger.info(f"Found lease IP: {ip}")
                         leases.add(ip)
             return leases
         except Exception:
@@ -285,7 +289,7 @@ class ATAKHandler:
                 with open(path, 'wb') as f:
                     f.write(compressed)
                 if src_port:
-                    print(f"ATAK to LoRa: From port {src_port} -> {filename}")
+                    self.logger.info(f"ATAK to LoRa: From port {src_port} -> {filename}")
             else:
                 # Clean up directories if all nodes in WIFI mode
                 self.cleanup_shared_directories()
@@ -300,7 +304,7 @@ class ATAKHandler:
             if self.socket_manager.send_packet(data, addr, port):
                 ports.append(str(port))
         if ports:
-            print(f"LoRa to ATAK: Writing to ports {','.join(ports)}")
+            self.logger.info(f"LoRa to ATAK: Writing to ports {','.join(ports)}")
 
     def process_incoming(self) -> None:
         """Process packets in the incoming directory"""
@@ -343,7 +347,7 @@ class ATAKHandler:
                         data, src = sock.recvfrom(65535)
                         ip_type = self.check_ip_location(src[0])
                         if port in [17012, 6969] and ip_type == "LOCAL":
-                            print(f"UDP RECEIVE: From port {port} ({len(data)} bytes)")
+                            self.logger.info(f"UDP RECEIVE: From port {port} ({len(data)} bytes)")
                             self.process_packet(data, port)
                     except socket.timeout:
                         continue

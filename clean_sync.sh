@@ -20,6 +20,7 @@ mkdir -p "$CLEAN_REPO_DIR/home/natak/mesh"
 mkdir -p "$CLEAN_REPO_DIR/home/natak/mesh_monitor/templates"
 mkdir -p "$CLEAN_REPO_DIR/home/natak/macsec_config_tool"
 mkdir -p "$CLEAN_REPO_DIR/home/natak/.reticulum"
+mkdir -p "$CLEAN_REPO_DIR/var/log/reticulum"
 
 echo "Copying files..."
 
@@ -121,6 +122,9 @@ cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implement
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/packet_handler_README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/test_setup.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/start_reticulum_stack.sh "$CLEAN_REPO_DIR/reticulum_mesh/"
+
+# Copy log files
+cp -v /var/log/reticulum/packet_logs.log "$CLEAN_REPO_DIR/var/log/reticulum/" 2>/dev/null || touch "$CLEAN_REPO_DIR/var/log/reticulum/packet_logs.log"
 
 # Create .gitkeep files for empty directories
 touch "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/shared/pending/.gitkeep"

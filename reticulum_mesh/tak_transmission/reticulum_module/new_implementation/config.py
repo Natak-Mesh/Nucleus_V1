@@ -18,7 +18,7 @@ STARTUP_DELAY = 10     # 10 seconds for LoRa radio
 BASE_DIR = "/home/natak/reticulum_mesh"
 NODE_STATUS_PATH = f"{BASE_DIR}/ogm_monitor/node_status.json"
 PEER_STATUS_PATH = f"{BASE_DIR}/tak_transmission/reticulum_module/new_implementation/peer_status.json"
-LOG_DIR = f"{BASE_DIR}/logs"
+LOG_DIR = "/var/log/reticulum"
 
 # Data directories
 INCOMING_DIR = f"{BASE_DIR}/tak_transmission/shared/incoming"

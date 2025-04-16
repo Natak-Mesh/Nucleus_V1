@@ -24,7 +24,7 @@ import logger
 class PacketManager:
     def __init__(self, peer_discovery=None):
         self.peer_discovery = peer_discovery
-        self.logger = logger.get_logger("PacketManager")
+        self.logger = logger.get_logger("PacketManager", "packet_logs.log")
         
         # Directory paths
         self.pending_dir = config.PENDING_DIR
