@@ -34,6 +34,7 @@ RETRY_JITTER = 0.3           # +/- 30% randomness added to calculated delay
 RETRY_MAX_ATTEMPTS = 5       # Max number of retry attempts before giving up
 RETRY_RATE_LIMIT = 1         # Max number of retries per second
 RETRY_CHECK_INTERVAL = 1     # Check for pending retries every second
+SEND_SPACING_DELAY = 2       # Seconds to wait between sending to different nodes
 
 # Logging configuration
 LOG_LEVEL = "INFO"

@@ -19,7 +19,10 @@ class PeerDiscovery:
     
     def __init__(self):
         """Initialize peer discovery"""
-        self.logger = logger.get_logger("PeerDiscovery")
+        self.logger = logger.get_logger("PeerDiscovery", "peer_discovery.log")
+        
+        # Clean up on startup
+        self.cleanup_on_startup()
         
         # Initialize RNS
         RNS.Reticulum()
@@ -95,6 +98,7 @@ class PeerDiscovery:
             
             # Update peer status file
             self.update_peer_status_file()
+            self.logger.info(f"Current peer map after add_peer: {self.peer_map}")
     
     def get_peer_identity(self, hostname):
         """Get a peer's identity"""
@@ -139,6 +143,29 @@ class PeerDiscovery:
         except Exception as e:
             self.logger.error(f"Error updating peer status file: {e}")
 
+    def cleanup_on_startup(self):
+        """Clean up all stored peer data on startup"""
+        self.logger.info("Cleaning up peer data on startup")
+        
+        # Reset peer tracking
+        self.peer_map = {}
+        self.last_seen = {}
+        
+        # Create fresh peer status file with empty peers
+        status = {
+            "timestamp": int(time.time()),
+            "peers": {}
+        }
+        
+        try:
+            json_path = f"{config.BASE_DIR}/tak_transmission/reticulum_module/new_implementation/peer_discovery.json"
+            with open(json_path, "w") as f:
+                json.dump(status, f, indent=2)
+            self.logger.info("Created fresh peer_discovery.json")
+            self.logger.info(f"Peer map after cleanup: {self.peer_map}")
+        except Exception as e:
+            self.logger.error(f"Error creating fresh peer status file: {e}")
+
     def shutdown(self):
         """Shutdown peer discovery"""
         self.should_quit = True
@@ -151,7 +178,7 @@ class AnnounceHandler:
     def __init__(self, aspect_filter=None, parent=None):
         self.aspect_filter = aspect_filter
         self.parent = parent
-        self.logger = logger.get_logger("AnnounceHandler")
+        self.logger = logger.get_logger("AnnounceHandler", "peer_discovery.log")
     
     def received_announce(self, destination_hash, announced_identity, app_data):
         """Handle incoming announces"""

@@ -36,6 +36,7 @@ class PacketManager:
 
         # Delivery tracking
         self.delivery_status = {}  # filename -> {nodes: {hostname: delivered}, first_sent: time, last_retry: time, retry_count: int}
+        self.last_send_time = 0  # timestamp of last send to respect radio cycle time
         
         # Ensure directories exist
         os.makedirs(self.pending_dir, exist_ok=True)
@@ -218,6 +219,11 @@ class PacketManager:
 
     def send_to_node(self, hostname, data, filename):
         """Send data to a specific node"""
+        # Check if enough time has passed since last radio send
+        current_time = time.time()
+        if current_time - self.last_send_time < config.SEND_SPACING_DELAY:
+            return False  # Too soon for radio
+
         # Get peer identity from peer_discovery
         peer_identity = self.peer_discovery.get_peer_identity(hostname)
         if not peer_identity:
@@ -282,6 +288,9 @@ class PacketManager:
 
             receipt.set_delivery_callback(on_delivery)
             receipt.set_timeout_callback(on_timeout)
+            
+            # Update last send time
+            self.last_send_time = current_time
             return True
 
         self.logger.error(f"Failed to send packet to {hostname}")
