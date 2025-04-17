@@ -89,10 +89,12 @@ class PacketManager:
                 if current_time - status["last_retry"] < delay:
                     continue
 
-                # Get nodes that need retry (failed, in LORA mode, and have identity)
+                # Get nodes that need retry (not delivered, in LORA mode, and have identity)
                 retry_nodes = [
                     node for node in lora_nodes
-                    if node in status["nodes"] and not status["nodes"][node] and self.peer_discovery.get_peer_identity(node)
+                    if (node in status["nodes"] and  # Node is in our tracking
+                        not status["nodes"][node] and  # Node hasn't received packet
+                        self.peer_discovery.get_peer_identity(node))  # Node has valid identity
                 ]
 
                 if retry_nodes:
@@ -172,26 +174,46 @@ class PacketManager:
 
     def get_lora_nodes(self):
         """Get list of nodes that are in LORA mode and have peer discovery entries"""
+        lora_nodes = []
         try:
-            # First get nodes in LORA mode
+            # First try to read node status
             with open(config.NODE_STATUS_PATH, 'r') as f:
-                status = json.load(f)
+                content = f.read()
+                if not content.strip():
+                    self.logger.error(f"Node status file is empty: {config.NODE_STATUS_PATH}")
+                    return []
+                status = json.loads(content)
                 lora_nodes = [
                     node["hostname"] 
                     for node in status.get("nodes", {}).values()
                     if node.get("mode") == "LORA"
                 ]
-            
-            # Then filter to only those with peer discovery entries
-            peer_discovery_path = os.path.join(os.path.dirname(config.NODE_STATUS_PATH), "..", "tak_transmission/reticulum_module/new_implementation/peer_discovery.json")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Invalid JSON in node status file: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Error reading node status file: {e}")
+            return []
+
+        try:
+            # Then try to read peer discovery
+            peer_discovery_path = os.path.join(os.path.dirname(config.NODE_STATUS_PATH), 
+                "..", "tak_transmission/reticulum_module/new_implementation/peer_discovery.json")
             with open(peer_discovery_path, 'r') as f:
-                peer_status = json.load(f)
+                content = f.read()
+                if not content.strip():
+                    self.logger.error(f"Peer discovery file is empty: {peer_discovery_path}")
+                    return []
+                peer_status = json.loads(content)
                 return [
                     node for node in lora_nodes
                     if node in peer_status.get("peers", {})
                 ]
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Invalid JSON in peer discovery file: {e}")
+            return []
         except Exception as e:
-            self.logger.error(f"Error reading status files: {e}")
+            self.logger.error(f"Error reading peer discovery file: {e}")
             return []
 
     def send_to_node(self, hostname, data, filename):
@@ -249,7 +271,14 @@ class PacketManager:
             def on_timeout(r):
                 self.logger.warning(f"Packet {filename} to {hostname} timed out")
                 if filename in self.delivery_status:
-                    self.delivery_status[filename]["nodes"][hostname] = False
+                    # Remove the file from sent buffer
+                    sent_path = os.path.join(self.sent_buffer, filename)
+                    try:
+                        os.remove(sent_path)
+                        del self.delivery_status[filename]
+                        self.logger.info(f"Removed timed out packet {filename} from sent buffer")
+                    except Exception as e:
+                        self.logger.error(f"Error removing timed out packet {filename} from sent buffer: {e}")
 
             receipt.set_delivery_callback(on_delivery)
             receipt.set_timeout_callback(on_timeout)
