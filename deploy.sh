@@ -31,7 +31,7 @@ cp -v "$CLEAN_REPO_DIR/home/natak/.reticulum/config" /home/natak/.reticulum/
 
 # Copy mesh files
 cp -v "$CLEAN_REPO_DIR/home/natak/mesh/batmesh.sh" /home/natak/mesh/
-#p -v "$CLEAN_REPO_DIR/home/natak/mesh/macsec.sh" /home/natak/mesh/
+#cp -v "$CLEAN_REPO_DIR/home/natak/mesh/macsec.sh" /home/natak/mesh/
 cp -v "$CLEAN_REPO_DIR/home/natak/mesh/mesh_config.env" /home/natak/mesh/
 cp -v "$CLEAN_REPO_DIR/home/natak/mesh/hostname_mapping.json" /home/natak/mesh/
 cp -v "$CLEAN_REPO_DIR/home/natak/mesh/README.md" /home/natak/mesh/
