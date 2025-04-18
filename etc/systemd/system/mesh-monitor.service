@@ -1,7 +1,5 @@
 [Unit]
 Description=Mesh Monitor Web Interface
-After=reticulum-mesh-rns-monitor.service
-Requires=reticulum-mesh-rns-monitor.service
 
 [Service]
 Type=simple
