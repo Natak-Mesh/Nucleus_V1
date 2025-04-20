@@ -1,10 +1,10 @@
 {
-  "timestamp": 1744934175,
+  "timestamp": 1745171996,
   "nodes": {
     "00:c0:ca:b6:92:cb": {
       "hostname": "takNode3",
       "ip": "192.168.200.3",
-      "failure_count": 1954,
+      "failure_count": 18107,
       "good_count": 0,
       "mode": "LORA",
       "last_seen": 999.0,
@@ -14,12 +14,12 @@
     "00:c0:ca:b6:95:23": {
       "hostname": "takNode2",
       "ip": "192.168.200.2",
-      "failure_count": 1954,
-      "good_count": 0,
-      "mode": "LORA",
-      "last_seen": 999.0,
-      "throughput": 0,
-      "nexthop": "unknown"
+      "failure_count": 0,
+      "good_count": 269,
+      "mode": "WIFI",
+      "last_seen": 0.092,
+      "throughput": 6.8,
+      "nexthop": "00:c0:ca:b6:95:23"
     }
   }
 }

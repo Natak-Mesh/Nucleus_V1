@@ -1,100 +1,100 @@
-2025-04-17 19:51:59,371 - Sending packet packet_1744933843854.zst to node takNode3
-2025-04-17 19:51:59,383 - Retrying packet_1744933843854.zst to takNode2 (retry #2)
-2025-04-17 19:51:59,386 - Sending packet packet_1744933843854.zst to node takNode2
-2025-04-17 19:52:00,700 - Received packet, saved to incoming_1744933920.zst
-2025-04-17 19:52:00,968 - LoRa to ATAK: Writing to ports 17013,6971
-2025-04-17 19:52:03,876 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:52:03,879 - ATAK to LoRa: From port 6969 -> packet_1744933923879.zst
-2025-04-17 19:52:04,406 - Sending packet packet_1744933923879.zst to node takNode3
-2025-04-17 19:52:04,411 - Sending packet packet_1744933923879.zst to node takNode2
-2025-04-17 19:52:04,488 - Received packet, saved to incoming_1744933924.zst
-2025-04-17 19:52:08,525 - Received packet, saved to incoming_1744933928.zst
-2025-04-17 19:52:08,647 - LoRa to ATAK: Writing to ports 17013,6971
-2025-04-17 19:52:09,420 - Retrying packet_1744933903758.zst to takNode3 (retry #1)
-2025-04-17 19:52:09,422 - Sending packet packet_1744933903758.zst to node takNode3
-2025-04-17 19:52:09,430 - Retrying packet_1744933903758.zst to takNode2 (retry #1)
-2025-04-17 19:52:09,432 - Sending packet packet_1744933903758.zst to node takNode2
-2025-04-17 19:52:19,452 - Retrying packet_1744933863749.zst to takNode3 (retry #2)
-2025-04-17 19:52:19,453 - Sending packet packet_1744933863749.zst to node takNode3
-2025-04-17 19:52:19,462 - Retrying packet_1744933863749.zst to takNode2 (retry #2)
-2025-04-17 19:52:19,464 - Sending packet packet_1744933863749.zst to node takNode2
-2025-04-17 19:52:23,764 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:52:23,768 - ATAK to LoRa: From port 6969 -> packet_1744933943767.zst
-2025-04-17 19:52:43,866 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:52:43,868 - ATAK to LoRa: From port 6969 -> packet_1744933963868.zst
-2025-04-17 19:53:03,971 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:53:03,974 - ATAK to LoRa: From port 6969 -> packet_1744933983974.zst
-2025-04-17 19:53:05,489 - Sending packet packet_1744933943767.zst to node takNode3
-2025-04-17 19:53:05,494 - Sending packet packet_1744933943767.zst to node takNode2
-2025-04-17 19:53:13,901 - Retrying packet_1744933883875.zst to takNode3 (retry #2)
-2025-04-17 19:53:13,903 - Sending packet packet_1744933883875.zst to node takNode3
-2025-04-17 19:53:13,923 - Retrying packet_1744933883875.zst to takNode2 (retry #2)
-2025-04-17 19:53:13,974 - Sending packet packet_1744933883875.zst to node takNode2
-2025-04-17 19:53:13,984 - Retrying packet_1744933903758.zst to takNode3 (retry #2)
-2025-04-17 19:53:13,992 - Retrying packet_1744933903758.zst to takNode2 (retry #2)
-2025-04-17 19:53:14,139 - Retrying packet_1744933923879.zst to takNode3 (retry #1)
-2025-04-17 19:53:14,185 - Retrying packet_1744933923879.zst to takNode2 (retry #1)
-2025-04-17 19:53:19,820 - PacketManager running
-2025-04-17 19:53:23,852 - Found lease IP: 192.168.200.17
-2025-04-17 19:53:23,853 - Found lease IP: 192.168.200.18
-2025-04-17 19:53:23,856 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:53:23,863 - ATAK to LoRa: From port 6969 -> packet_1744934003863.zst
-2025-04-17 19:53:24,825 - Sending packet packet_1744934003863.zst to node takNode3
-2025-04-17 19:53:43,970 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:53:43,973 - ATAK to LoRa: From port 6969 -> packet_1744934023972.zst
-2025-04-17 19:53:44,847 - Sending packet packet_1744934023972.zst to node takNode3
-2025-04-17 19:53:49,863 - Retrying packet_1744934003863.zst to takNode3 (retry #1)
-2025-04-17 19:53:49,864 - Sending packet packet_1744934003863.zst to node takNode3
-2025-04-17 19:54:03,780 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:54:03,787 - ATAK to LoRa: From port 6969 -> packet_1744934043786.zst
-2025-04-17 19:54:03,885 - Sending packet packet_1744934043786.zst to node takNode3
-2025-04-17 19:54:09,898 - Retrying packet_1744934023972.zst to takNode3 (retry #1)
-2025-04-17 19:54:09,899 - Sending packet packet_1744934023972.zst to node takNode3
-2025-04-17 19:54:23,891 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:54:23,894 - ATAK to LoRa: From port 6969 -> packet_1744934063894.zst
-2025-04-17 19:54:23,919 - Sending packet packet_1744934063894.zst to node takNode3
-2025-04-17 19:54:28,928 - Retrying packet_1744934043786.zst to takNode3 (retry #1)
-2025-04-17 19:54:28,929 - Sending packet packet_1744934043786.zst to node takNode3
-2025-04-17 19:54:28,941 - Retrying packet_1744934043786.zst to takNode2 (retry #1)
-2025-04-17 19:54:39,950 - Retrying packet_1744934003863.zst to takNode3 (retry #2)
-2025-04-17 19:54:39,951 - Sending packet packet_1744934003863.zst to node takNode3
-2025-04-17 19:54:43,996 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:54:43,999 - ATAK to LoRa: From port 6969 -> packet_1744934083999.zst
-2025-04-17 19:54:44,965 - Sending packet packet_1744934083999.zst to node takNode3
-2025-04-17 19:55:03,799 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:55:03,805 - ATAK to LoRa: From port 6969 -> packet_1744934103804.zst
-2025-04-17 19:55:04,474 - Sending packet packet_1744934083999.zst to node takNode2
-2025-04-17 19:55:04,489 - Retrying packet_1744934023972.zst to takNode3 (retry #2)
-2025-04-17 19:55:04,491 - Retrying packet_1744934063894.zst to takNode3 (retry #1)
-2025-04-17 19:55:04,495 - Retrying packet_1744934063894.zst to takNode2 (retry #1)
-2025-04-17 19:55:10,504 - Retrying packet_1744934083999.zst to takNode3 (retry #1)
-2025-04-17 19:55:10,506 - Sending packet packet_1744934083999.zst to node takNode3
-2025-04-17 19:55:10,514 - Retrying packet_1744934083999.zst to takNode2 (retry #1)
-2025-04-17 19:55:19,522 - Retrying packet_1744934043786.zst to takNode3 (retry #2)
-2025-04-17 19:55:19,524 - Sending packet packet_1744934043786.zst to node takNode3
-2025-04-17 19:55:19,540 - Retrying packet_1744934043786.zst to takNode2 (retry #2)
-2025-04-17 19:55:25,286 - PacketManager running
-2025-04-17 19:55:35,797 - Received packet, saved to incoming_1744934135.zst
-2025-04-17 19:55:36,016 - LoRa to ATAK: Writing to ports 17013,6971
-2025-04-17 19:55:43,914 - Found lease IP: 192.168.200.17
-2025-04-17 19:55:43,916 - Found lease IP: 192.168.200.18
-2025-04-17 19:55:43,919 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:55:43,927 - ATAK to LoRa: From port 6969 -> packet_1744934143927.zst
-2025-04-17 19:55:44,300 - Sending packet packet_1744934143927.zst to node takNode2
-2025-04-17 19:55:47,756 - Packet packet_1744934143927.zst delivered to takNode2 (RTT: 3.453 seconds)
-2025-04-17 19:55:47,758 - All nodes received packet_1744934143927.zst - removed from sent buffer
-2025-04-17 19:55:49,633 - UDP RECEIVE: From port 17012 (771 bytes)
-2025-04-17 19:55:49,640 - ATAK to LoRa: From port 17012 -> packet_1744934149640.zst
-2025-04-17 19:55:50,311 - Sending packet packet_1744934149640.zst to node takNode2
-2025-04-17 19:55:54,506 - Packet packet_1744934149640.zst delivered to takNode2 (RTT: 4.188 seconds)
-2025-04-17 19:55:54,507 - All nodes received packet_1744934149640.zst - removed from sent buffer
-2025-04-17 19:55:57,902 - Received packet, saved to incoming_1744934157.zst
-2025-04-17 19:55:57,923 - LoRa to ATAK: Writing to ports 17013,6971
-2025-04-17 19:56:03,942 - UDP RECEIVE: From port 6969 (322 bytes)
-2025-04-17 19:56:03,949 - ATAK to LoRa: From port 6969 -> packet_1744934163949.zst
-2025-04-17 19:56:04,336 - Sending packet packet_1744934163949.zst to node takNode2
-2025-04-17 19:56:04,589 - Received packet, saved to incoming_1744934164.zst
-2025-04-17 19:56:04,676 - LoRa to ATAK: Writing to ports 17013,6971
-2025-04-17 19:56:12,575 - Packet packet_1744934163949.zst delivered to takNode2 (RTT: 8.229 seconds)
-2025-04-17 19:56:12,577 - All nodes received packet_1744934163949.zst - removed from sent buffer
-2025-04-17 19:56:15,883 - Received packet, saved to incoming_1744934175.zst
+2025-04-18 20:02:32,061 - All nodes received packet_1745020948542.zst - removed from sent buffer
+2025-04-18 20:02:35,785 - Received packet, saved to incoming_1745020955.zst
+2025-04-18 20:02:35,797 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:02:48,656 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:02:48,659 - ATAK to LoRa: From port 6969 -> packet_1745020968658.zst
+2025-04-18 20:02:49,581 - Sending packet packet_1745020968658.zst to node takNode2
+2025-04-18 20:02:54,179 - Received packet, saved to incoming_1745020974.zst
+2025-04-18 20:02:54,355 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:02:55,076 - Packet packet_1745020968658.zst delivered to takNode2 (RTT: 5.491 seconds)
+2025-04-18 20:02:55,078 - All nodes received packet_1745020968658.zst - removed from sent buffer
+2025-04-18 20:03:08,465 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:03:08,471 - ATAK to LoRa: From port 6969 -> packet_1745020988471.zst
+2025-04-18 20:03:08,604 - Sending packet packet_1745020988471.zst to node takNode2
+2025-04-18 20:03:12,153 - Packet packet_1745020988471.zst delivered to takNode2 (RTT: 3.54 seconds)
+2025-04-18 20:03:12,155 - All nodes received packet_1745020988471.zst - removed from sent buffer
+2025-04-18 20:03:14,274 - Received packet, saved to incoming_1745020994.zst
+2025-04-18 20:03:14,481 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:03:28,580 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:03:28,586 - ATAK to LoRa: From port 6969 -> packet_1745021008586.zst
+2025-04-18 20:03:28,642 - Sending packet packet_1745021008586.zst to node takNode2
+2025-04-18 20:03:32,118 - Packet packet_1745021008586.zst delivered to takNode2 (RTT: 3.468 seconds)
+2025-04-18 20:03:32,120 - All nodes received packet_1745021008586.zst - removed from sent buffer
+2025-04-18 20:03:34,314 - Received packet, saved to incoming_1745021014.zst
+2025-04-18 20:03:34,601 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:03:48,479 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:03:48,485 - ATAK to LoRa: From port 6969 -> packet_1745021028485.zst
+2025-04-18 20:03:48,676 - Sending packet packet_1745021028485.zst to node takNode2
+2025-04-18 20:03:54,629 - Received packet, saved to incoming_1745021034.zst
+2025-04-18 20:03:54,801 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:03:55,603 - Packet packet_1745021028485.zst delivered to takNode2 (RTT: 6.92 seconds)
+2025-04-18 20:03:55,605 - All nodes received packet_1745021028485.zst - removed from sent buffer
+2025-04-18 20:04:08,589 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:04:08,595 - ATAK to LoRa: From port 6969 -> packet_1745021048595.zst
+2025-04-18 20:04:08,705 - Sending packet packet_1745021048595.zst to node takNode2
+2025-04-18 20:04:12,255 - Packet packet_1745021048595.zst delivered to takNode2 (RTT: 3.543 seconds)
+2025-04-18 20:04:12,256 - All nodes received packet_1745021048595.zst - removed from sent buffer
+2025-04-18 20:04:14,367 - Received packet, saved to incoming_1745021054.zst
+2025-04-18 20:04:14,601 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:04:28,701 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:04:28,707 - ATAK to LoRa: From port 6969 -> packet_1745021068706.zst
+2025-04-18 20:04:28,734 - Sending packet packet_1745021068706.zst to node takNode2
+2025-04-18 20:04:32,298 - Packet packet_1745021068706.zst delivered to takNode2 (RTT: 3.556 seconds)
+2025-04-18 20:04:32,300 - All nodes received packet_1745021068706.zst - removed from sent buffer
+2025-04-18 20:04:34,414 - Received packet, saved to incoming_1745021074.zst
+2025-04-18 20:04:34,724 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:04:48,519 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:04:48,525 - ATAK to LoRa: From port 6969 -> packet_1745021088524.zst
+2025-04-18 20:04:48,768 - Sending packet packet_1745021088524.zst to node takNode2
+2025-04-18 20:04:54,571 - Received packet, saved to incoming_1745021094.zst
+2025-04-18 20:04:54,846 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:04:55,458 - Packet packet_1745021088524.zst delivered to takNode2 (RTT: 6.683 seconds)
+2025-04-18 20:04:55,459 - All nodes received packet_1745021088524.zst - removed from sent buffer
+2025-04-18 20:05:08,636 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:05:08,641 - ATAK to LoRa: From port 6969 -> packet_1745021108641.zst
+2025-04-18 20:05:08,798 - Sending packet packet_1745021108641.zst to node takNode2
+2025-04-18 20:05:12,359 - Packet packet_1745021108641.zst delivered to takNode2 (RTT: 3.554 seconds)
+2025-04-18 20:05:12,361 - All nodes received packet_1745021108641.zst - removed from sent buffer
+2025-04-18 20:05:14,478 - Received packet, saved to incoming_1745021114.zst
+2025-04-18 20:05:14,650 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:05:28,534 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:05:28,539 - ATAK to LoRa: From port 6969 -> packet_1745021128539.zst
+2025-04-18 20:05:28,830 - Sending packet packet_1745021128539.zst to node takNode2
+2025-04-18 20:05:32,324 - Packet packet_1745021128539.zst delivered to takNode2 (RTT: 3.487 seconds)
+2025-04-18 20:05:32,327 - All nodes received packet_1745021128539.zst - removed from sent buffer
+2025-04-18 20:05:34,437 - Received packet, saved to incoming_1745021134.zst
+2025-04-18 20:05:34,549 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:05:48,645 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:05:48,651 - ATAK to LoRa: From port 6969 -> packet_1745021148650.zst
+2025-04-18 20:05:48,862 - Sending packet packet_1745021148650.zst to node takNode2
+2025-04-18 20:05:54,442 - Received packet, saved to incoming_1745021154.zst
+2025-04-18 20:05:54,661 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:05:55,419 - Packet packet_1745021148650.zst delivered to takNode2 (RTT: 6.542 seconds)
+2025-04-18 20:05:55,421 - All nodes received packet_1745021148650.zst - removed from sent buffer
+2025-04-18 20:06:08,535 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:06:08,542 - ATAK to LoRa: From port 6969 -> packet_1745021168541.zst
+2025-04-18 20:06:08,901 - Sending packet packet_1745021168541.zst to node takNode2
+2025-04-18 20:06:12,398 - Packet packet_1745021168541.zst delivered to takNode2 (RTT: 3.489 seconds)
+2025-04-18 20:06:12,400 - All nodes received packet_1745021168541.zst - removed from sent buffer
+2025-04-18 20:06:14,512 - Received packet, saved to incoming_1745021174.zst
+2025-04-18 20:06:14,550 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:06:28,646 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:06:28,649 - ATAK to LoRa: From port 6969 -> packet_1745021188648.zst
+2025-04-18 20:06:28,933 - Sending packet packet_1745021188648.zst to node takNode2
+2025-04-18 20:06:32,438 - Packet packet_1745021188648.zst delivered to takNode2 (RTT: 3.502 seconds)
+2025-04-18 20:06:32,440 - All nodes received packet_1745021188648.zst - removed from sent buffer
+2025-04-18 20:06:36,541 - Received packet, saved to incoming_1745021196.zst
+2025-04-18 20:06:36,832 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:06:48,752 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:06:48,756 - ATAK to LoRa: From port 6969 -> packet_1745021208756.zst
+2025-04-18 20:06:48,953 - Sending packet packet_1745021208756.zst to node takNode2
+2025-04-18 20:06:53,235 - Packet packet_1745021208756.zst delivered to takNode2 (RTT: 4.274 seconds)
+2025-04-18 20:06:53,236 - All nodes received packet_1745021208756.zst - removed from sent buffer
+2025-04-18 20:06:55,095 - Received packet, saved to incoming_1745021215.zst
+2025-04-18 20:06:55,382 - LoRa to ATAK: Writing to ports 17013,6971
+2025-04-18 20:07:08,553 - UDP RECEIVE: From port 6969 (322 bytes)
+2025-04-18 20:07:08,560 - ATAK to LoRa: From port 6969 -> packet_1745021228559.zst
+2025-04-18 20:07:08,979 - Sending packet packet_1745021228559.zst to node takNode2
+2025-04-18 20:07:14,148 - Packet packet_1745021228559.zst delivered to takNode2 (RTT: 5.162 seconds)
+2025-04-18 20:07:14,149 - All nodes received packet_1745021228559.zst - removed from sent buffer
+2025-04-18 20:08:18,776 - PacketManager running
