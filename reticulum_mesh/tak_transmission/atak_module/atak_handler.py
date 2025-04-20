@@ -102,6 +102,201 @@ ATAK_OUT_PORTS = [17012, 6969, 7171]
 LORA_OUT_ADDRS = ["224.10.10.1", "239.2.3.1"]
 LORA_OUT_PORTS = [17013, 6971]
 
+class NetworkStateMonitor:
+    """
+    Monitors network state changes and refreshes sockets when needed.
+    This helps maintain connectivity when interfaces change state.
+    """
+    
+    def __init__(self, atak_handler):
+        """Initialize the network state monitor"""
+        self.atak_handler = atak_handler
+        self.logger = atak_handler.logger
+        self.should_quit = False
+        
+        # Track interface states
+        self.wlan1_state = self.get_interface_state("wlan1")
+        self.bat0_state = self.get_interface_state("bat0")
+        
+        # Track socket activity
+        self.last_packet_received = time.time()
+        
+        # Track node status
+        self.node_status = self.get_node_status()
+        
+        # Start monitoring threads
+        self.start_monitoring()
+    
+    def start_monitoring(self):
+        """Start all monitoring threads"""
+        threading.Thread(target=self.monitor_interface_states, daemon=True).start()
+        threading.Thread(target=self.monitor_socket_activity, daemon=True).start()
+        threading.Thread(target=self.monitor_node_status, daemon=True).start()
+        self.logger.info("Network state monitoring started")
+    
+    def get_interface_state(self, interface):
+        """Get state of a network interface"""
+        try:
+            # Check if interface exists and get its state
+            result = subprocess.run(
+                ["ip", "link", "show", interface],
+                capture_output=True, text=True, check=False
+            )
+            
+            if result.returncode != 0:
+                return {"exists": False}
+            
+            # Parse link state (UP/DOWN)
+            link_state = "DOWN"
+            if "state UP" in result.stdout:
+                link_state = "UP"
+            
+            # Check if RUNNING (carrier)
+            running = "RUNNING" in result.stdout
+            
+            return {
+                "exists": True,
+                "state": link_state,
+                "running": running
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting interface state for {interface}: {e}")
+            return {"exists": False, "error": str(e)}
+    
+    def get_node_status(self):
+        """Get status of all nodes from node_status.json"""
+        try:
+            with open("/home/natak/reticulum_mesh/ogm_monitor/node_status.json", 'r') as f:
+                status = json.load(f)
+                
+            # Extract node status
+            modes = {}
+            for mac, node_info in status.get("nodes", {}).items():
+                hostname = node_info.get("hostname")
+                mode = node_info.get("mode")
+                if hostname and mode:
+                    modes[hostname] = mode
+            
+            return modes
+        except Exception as e:
+            self.logger.error(f"Error getting node status: {e}")
+            return {}
+    
+    def monitor_interface_states(self):
+        """Monitor interface states and trigger socket refresh on changes"""
+        self.logger.info("Starting interface state monitoring")
+        while not self.should_quit:
+            try:
+                # Get current states
+                current_wlan1_state = self.get_interface_state("wlan1")
+                current_bat0_state = self.get_interface_state("bat0")
+                
+                # Check for significant changes
+                wlan1_changed = (
+                    self.wlan1_state.get("exists") != current_wlan1_state.get("exists") or
+                    self.wlan1_state.get("state") != current_wlan1_state.get("state") or
+                    self.wlan1_state.get("running") != current_wlan1_state.get("running")
+                )
+                
+                bat0_changed = (
+                    self.bat0_state.get("exists") != current_bat0_state.get("exists") or
+                    self.bat0_state.get("state") != current_bat0_state.get("state") or
+                    self.bat0_state.get("running") != current_bat0_state.get("running")
+                )
+                
+                # If wlan1 or bat0 changed state, refresh sockets
+                if wlan1_changed:
+                    self.logger.info(f"wlan1 state changed: {self.wlan1_state} -> {current_wlan1_state}")
+                    self.refresh_sockets("wlan1 state change")
+                
+                if bat0_changed:
+                    self.logger.info(f"bat0 state changed: {self.bat0_state} -> {current_bat0_state}")
+                    self.refresh_sockets("bat0 state change")
+                
+                # Update stored states
+                self.wlan1_state = current_wlan1_state
+                self.bat0_state = current_bat0_state
+                
+                # Check every 2 seconds
+                time.sleep(2)
+            except Exception as e:
+                self.logger.error(f"Error in interface state monitoring: {e}")
+                time.sleep(5)  # Longer delay on error
+    
+    def monitor_socket_activity(self):
+        """Monitor socket activity and refresh if no packets received"""
+        self.logger.info("Starting socket activity monitoring")
+        INACTIVITY_THRESHOLD = 30  # 30 seconds without packets is considered inactive
+        
+        while not self.should_quit:
+            try:
+                current_time = time.time()
+                time_since_last_packet = current_time - self.last_packet_received
+                
+                if time_since_last_packet > INACTIVITY_THRESHOLD:
+                    self.logger.warning(f"No packets received for {time_since_last_packet:.1f} seconds")
+                    self.refresh_sockets("socket inactivity")
+                    # Reset timer to avoid continuous refreshes
+                    self.last_packet_received = current_time
+                
+                time.sleep(5)
+            except Exception as e:
+                self.logger.error(f"Error in socket activity monitoring: {e}")
+                time.sleep(5)
+    
+    def monitor_node_status(self):
+        """Monitor node status and refresh sockets on mode changes"""
+        self.logger.info("Starting node status monitoring")
+        while not self.should_quit:
+            try:
+                current_status = self.get_node_status()
+                
+                # Check for mode changes
+                for hostname, mode in current_status.items():
+                    if hostname in self.node_status and self.node_status[hostname] != mode:
+                        self.logger.info(f"Node {hostname} mode changed: {self.node_status[hostname]} -> {mode}")
+                        self.refresh_sockets(f"node {hostname} mode change")
+                        break
+                
+                # Update stored status
+                self.node_status = current_status
+                
+                time.sleep(5)
+            except Exception as e:
+                self.logger.error(f"Error in node status monitoring: {e}")
+                time.sleep(5)
+    
+    def refresh_sockets(self, reason):
+        """Refresh all sockets in the ATAK handler"""
+        self.logger.info(f"Refreshing sockets due to: {reason}")
+        
+        try:
+            # Clean up existing sockets
+            for (addr, port) in list(self.atak_handler.atak_listening_sockets.keys()):
+                self.atak_handler.cleanup_atak_socket(addr, port)
+            
+            # Clean up socket manager sockets
+            self.atak_handler.socket_manager.cleanup_sockets()
+            
+            # Small delay to ensure clean shutdown
+            time.sleep(1)
+            
+            # Set up new sockets
+            self.atak_handler.setup_atak_listening_sockets()
+            self.atak_handler.socket_manager.setup_persistent_sockets()
+            
+            self.logger.info("Socket refresh completed successfully")
+        except Exception as e:
+            self.logger.error(f"Error refreshing sockets: {e}")
+    
+    def packet_received(self):
+        """Call this when a packet is received to update activity timestamp"""
+        self.last_packet_received = time.time()
+    
+    def stop(self):
+        """Stop the network state monitor"""
+        self.should_quit = True
+
 class ATAKHandler:
     def __init__(self, shared_dir: str = "/home/natak/reticulum_mesh/tak_transmission/shared"):
         """Initialize handler"""
@@ -128,14 +323,17 @@ class ATAKHandler:
         self.MAX_RECENT_PACKETS = 1000
         self.recent_packets = deque(maxlen=self.MAX_RECENT_PACKETS)
         
-        # Node modes path
-        self.node_modes_path = "/home/natak/reticulum_mesh/ogm_monitor/node_status.json"
+        # Node status path
+        self.node_status_path = "/home/natak/reticulum_mesh/ogm_monitor/node_status.json"
         
         # Set up ATAK listening sockets for receiving
         self.setup_atak_listening_sockets()
         
         # Set up socket manager for sending
         self.socket_manager = LoraOutSocketManager()
+        
+        # Set up network state monitor
+        self.network_monitor = NetworkStateMonitor(self)
         
     def get_br0_ip(self):
         """Get the IP address of the br0 interface"""
@@ -200,7 +398,7 @@ class ATAKHandler:
         """Get list of nodes that are in LORA mode and have peer discovery entries"""
         try:
             # First get nodes in LORA mode
-            with open(self.node_modes_path, 'r') as f:
+            with open(self.node_status_path, 'r') as f:
                 status = json.load(f)
                 lora_nodes = [
                     node["hostname"] 
@@ -355,6 +553,9 @@ class ATAKHandler:
                     sock.settimeout(0.1)
                     try:
                         data, src = sock.recvfrom(65535)
+                        # Update network monitor when packet received
+                        self.network_monitor.packet_received()
+                        
                         ip_type = self.check_ip_location(src[0])
                         if port in [17012, 6969] and ip_type == "LOCAL":
                             self.logger.info(f"UDP RECEIVE: From port {port} ({len(data)} bytes)")
@@ -374,6 +575,7 @@ class ATAKHandler:
                 time.sleep(0.01)
                 
         except KeyboardInterrupt:
+            self.network_monitor.stop()
             for sock in self.atak_listening_sockets.values():
                 sock.close()
 
