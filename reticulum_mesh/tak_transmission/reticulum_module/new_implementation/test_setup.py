@@ -40,6 +40,10 @@ def main():
     packet_manager_thread.daemon = True
     packet_manager_thread.start()
     
+    # Wait for LoRa radio initialization
+    print(f"Waiting {config.STARTUP_DELAY} seconds for LoRa radio initialization...")
+    time.sleep(config.STARTUP_DELAY)
+    
     # Start ATAK handler as subprocess
     print("Starting ATAK Handler...")
     atak_process = subprocess.Popen(
