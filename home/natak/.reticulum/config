@@ -28,14 +28,14 @@
     port = /dev/ttyACM0
     frequency = 915000000
     bandwidth = 250000
-    txpower = 20
-    spreadingfactor = 11
+    txpower = 22
+    spreadingfactor = 10
     codingrate = 5
     mode = full
     bitrate = 1300  # 1.3 kbps for typical LoRa config
 
   [[TCP Server Interface]]
     type = TCPServerInterface
-    interface_enabled = no
+    interface_enabled = True
     listen_ip = 0.0.0.0  # Listen on all interfaces
     listen_port = 4242   # Choose any port you like
