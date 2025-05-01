@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Mesh Monitor</title>
-    <meta http-equiv="refresh" content="5">
+    <!-- Removed meta refresh, using AJAX instead -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
@@ -78,6 +78,61 @@
             margin: 8px 0;
         }
     </style>
+    <script>
+        function updateData() {
+            fetch('/api/node-status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update the hostname
+                    document.querySelector('h1').textContent = data.hostname;
+                    
+                    // Update node status
+                    const nodeGrid = document.querySelector('.node-grid');
+                    nodeGrid.innerHTML = '';  // Clear current nodes
+                    
+                    Object.entries(data.node_status).forEach(([mac, node]) => {
+                        nodeGrid.innerHTML += `
+                            <div class="node-card">
+                                <h3>${node.hostname}</h3>
+                                <div class="stats">IP: ${node.ip}</div>
+                                <div class="stats">MAC: ${mac}</div>
+                                <div class="stats">Mode: <span class="mode-${node.mode.toLowerCase()}">${node.mode}</span></div>
+                                <div class="stats">Last Seen: ${node.last_seen.toFixed(2)}s</div>
+                                <div class="stats">Throughput: ${node.throughput.toFixed(1)}</div>
+                                <div class="stats">Next Hop: ${node.nexthop}</div>
+                                <div class="stats">Failure Count: ${node.failure_count}</div>
+                                <div class="stats">Good Count: ${node.good_count}</div>
+                            </div>
+                        `;
+                    });
+                    
+                    // Update peer list
+                    const peerList = document.querySelector('.peer-list');
+                    peerList.innerHTML = '';  // Clear current peers
+                    
+                    Object.entries(data.peer_discovery).forEach(([name, peer]) => {
+                        const secondsAgo = Math.floor(peer.current_time - peer.last_seen);
+                        peerList.innerHTML += `
+                            <div class="peer-card">
+                                <h3>${name}</h3>
+                                <div class="stats">Destination Hash: ${peer.destination_hash}</div>
+                                <div class="stats">Last Seen: ${secondsAgo} seconds ago</div>
+                            </div>
+                        `;
+                    });
+                    
+                    // Schedule next update
+                    setTimeout(updateData, 2000); // Refresh every 2 seconds (faster than before)
+                })
+                .catch(error => {
+                    console.error('Update failed:', error);
+                    setTimeout(updateData, 2000); // Try again
+                });
+        }
+        
+        // Start the update cycle when page loads
+        document.addEventListener('DOMContentLoaded', updateData);
+    </script>
 </head>
 <body>
     <h1>{{ hostname }}</h1>

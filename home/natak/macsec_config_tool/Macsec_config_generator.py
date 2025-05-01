@@ -87,9 +87,17 @@ class MeshConfigurator:
         return '\n'.join(lines)
 
     def generate_mapping_file(self) -> str:
-        mapping = {}
+        # Generate a single shared key for all nodes (do this once)
+        if not hasattr(self, '_shared_group_key'):
+            self._shared_group_key = secrets.token_hex(32)  # 32 bytes = 64 hex chars
+            
+        mapping = {
+            "reticulum_group_key": self._shared_group_key,  # Clearly labeled as Reticulum key
+            "nodes": {}
+        }
+        
         for mac, node in self.nodes.items():
-            mapping[mac] = {
+            mapping["nodes"][mac] = {
                 "hostname": node.hostname,
                 "ip": node.ip.replace("/24", "")  # Remove /24 for the mapping file
             }

@@ -82,32 +82,62 @@
         .msg-default { color: var(--default-color); }
     </style>
     <script>
-        let refreshTimer;
-
-        function checkScroll() {
-            const logs = document.querySelector('.logs');
-            const atBottom = Math.abs(logs.scrollHeight - logs.clientHeight - logs.scrollTop) < 50;
-            
-            if (atBottom && !refreshTimer) {
-                refreshTimer = setInterval(() => location.reload(), 5000);
-            } else if (!atBottom && refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
-            }
+        let lastLogCount = 0;
+        
+        function updateLogs() {
+            fetch('/api/packet-logs')
+                .then(response => response.json())
+                .then(data => {
+                    // Update hostname
+                    document.querySelector('small').textContent = data.hostname;
+                    
+                    const logsContainer = document.querySelector('.logs');
+                    const atBottom = Math.abs(logsContainer.scrollHeight - logsContainer.clientHeight - logsContainer.scrollTop) < 50;
+                    
+                    // Clear and rebuild logs
+                    if (data.logs.length !== lastLogCount) {
+                        // Only update DOM if there are changes
+                        logsContainer.innerHTML = '';
+                        
+                        data.logs.forEach(log => {
+                            logsContainer.innerHTML += `
+                                <div class="log-line">
+                                    <span class="log-time">[${log.time}]</span>
+                                    <span class="msg-${log.type}">${log.message}</span>
+                                </div>
+                            `;
+                        });
+                        
+                        // Update count
+                        lastLogCount = data.logs.length;
+                        
+                        // Scroll to bottom if we were already at bottom
+                        if (atBottom) {
+                            logsContainer.scrollTop = logsContainer.scrollHeight;
+                        }
+                    }
+                    
+                    // Schedule next update
+                    setTimeout(updateLogs, 2000); // Refresh every 2 seconds
+                })
+                .catch(error => {
+                    console.error('Update failed:', error);
+                    setTimeout(updateLogs, 2000); // Try again on error
+                });
         }
-
-        window.onload = function() {
+        
+        // Start the update cycle and set up initial scroll
+        document.addEventListener('DOMContentLoaded', function() {
             const logs = document.querySelector('.logs');
             logs.scrollTop = logs.scrollHeight;
-            logs.onscroll = checkScroll;
-            checkScroll();
-        }
+            updateLogs();
+        });
     </script>
 </head>
 <body>
-    <div class="header" style="margin:0;padding:0;line-height:1">
+    <div class="header" style="margin:0;padding:0;line-height:1;display:flex;align-items:center">
         <small>{{ hostname }}</small>
-        <a href="/" style="margin:0 0 2px 8px">←</a>
+        <a href="/" style="margin:0 0 0 8px;font-size:24px;padding:8px;display:flex;align-items:center;justify-content:center">←</a>
     </div>
     <div class="logs">
         {% for log in logs %}

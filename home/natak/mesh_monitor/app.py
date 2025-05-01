@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 import socket
 import subprocess
 import json
@@ -80,7 +80,8 @@ def read_packet_logs():
             logs = []
             for line in lines:
                 parsed = parse_log_line(line)
-                if parsed:
+                # Only add logs that aren't of the types we want to filter out
+                if parsed and parsed['type'] not in ['udp', 'atak-to-lora', 'lora-to-atak']:
                     logs.append(parsed)
             return logs
     except Exception as e:
@@ -93,6 +94,21 @@ def packet_logs():
     return render_template('packet_logs.html', 
                          hostname=socket.gethostname(),
                          logs=logs)
+
+@app.route('/api/node-status')
+def api_node_status():
+    return jsonify({
+        'hostname': socket.gethostname(),
+        'node_status': read_node_status(),
+        'peer_discovery': read_peer_discovery()
+    })
+
+@app.route('/api/packet-logs')
+def api_packet_logs():
+    return jsonify({
+        'hostname': socket.gethostname(),
+        'logs': read_packet_logs()
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
