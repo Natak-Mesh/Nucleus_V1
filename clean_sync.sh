@@ -113,6 +113,7 @@ cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implement
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 #cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/link_manager.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/packet_manager.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
+cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/timing_fix_packet_manager.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 #cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/reticulum_handler.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 #cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/run_reticulum.py "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
 cp -v /home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/README.md "$CLEAN_REPO_DIR/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/"
