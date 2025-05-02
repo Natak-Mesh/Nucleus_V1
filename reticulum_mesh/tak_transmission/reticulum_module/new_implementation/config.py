@@ -34,7 +34,7 @@ RETRY_JITTER = 0.3           # +/- 30% randomness added to calculated delay
 RETRY_MAX_ATTEMPTS = 5       # Max number of retry attempts before giving up
 RETRY_RATE_LIMIT = 1         # Max number of retries per second
 RETRY_CHECK_INTERVAL = 1     # Check for pending retries every second
-SEND_SPACING_DELAY = 5       # Minimum seconds between ANY packet transmissions (global rate limit)
+SEND_SPACING_DELAY = 4       # Minimum seconds between ANY packet transmissions (global rate limit)
 
 # Logging configuration
 LOG_LEVEL = "INFO"
