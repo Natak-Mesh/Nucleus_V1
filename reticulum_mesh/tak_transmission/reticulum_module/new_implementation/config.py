@@ -27,7 +27,7 @@ PROCESSING_DIR = f"{BASE_DIR}/tak_transmission/shared/processing"
 SENT_BUFFER_DIR = f"{BASE_DIR}/tak_transmission/shared/sent_buffer"
 
 # Retry mechanism configuration
-RETRY_INITIAL_DELAY = 12     # seconds - Base delay for first retry
+RETRY_INITIAL_DELAY = 50     # seconds - Base delay for first retry
 RETRY_BACKOFF_FACTOR = 2     # Multiplier for delay increase (doubles each time)
 RETRY_MAX_DELAY = 120        # seconds - Maximum allowed delay between retries
 RETRY_JITTER = 0.3           # +/- 30% randomness added to calculated delay

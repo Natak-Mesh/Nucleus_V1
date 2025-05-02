@@ -162,6 +162,13 @@ class PacketManager:
             for node in valid_nodes:
                 try:
                     if self.peer_discovery:  # Only try if peer_discovery exists
+                        # Check if we need to wait before sending to respect radio timing
+                        current_time = time.time()
+                        wait_time = config.SEND_SPACING_DELAY - (current_time - self.last_send_time)
+                        if wait_time > 0:
+                            self.logger.info(f"Waiting {wait_time:.2f} seconds before sending to {node} to respect radio timing")
+                            time.sleep(wait_time)
+                        
                         self.send_to_node(node, data, filename)
                 except Exception as e:
                     self.logger.error(f"Error sending to {node}: {e}")
