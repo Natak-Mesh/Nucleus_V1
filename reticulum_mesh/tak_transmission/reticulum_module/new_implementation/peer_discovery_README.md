@@ -2,7 +2,7 @@
 
 ## Overview
 
-The PeerDiscovery module is responsible for announcing our presence on the Reticulum network, tracking peers, and maintaining mappings between identities and hostnames. It operates independently of specific transport mediums (such as WiFi or LoRa) and provides a synchronized JSON state file for other modules to access peer information.
+The PeerDiscovery module is responsible for announcing our presence on the Reticulum network, tracking peers, and maintaining mappings between identities and hostnames. It operates independently of specific transport mediums (such as WiFi or LoRa) and provides a synchronized JSON state file for other modules to access peer information. The module is designed to be simple, resilient, and to ensure bi-directional peer discovery in the mesh network.
 
 ## Core Functionality
 
@@ -14,8 +14,15 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
   - APP_NAME and ASPECT from config
 - This destination is what other nodes will use to communicate with us
 - The destination is announced periodically to let other nodes know how to reach us
+- Sets automatic proof strategy (RNS.Destination.PROVE_ALL) to validate all received packets
 
-### 2. Configuration and Filtering
+### 2. Startup and Cleanup
+- Performs a complete cleanup of peer data on startup
+- Creates a fresh peer_discovery.json file with empty peers
+- Ensures no stale peer information persists between restarts
+- Resets all internal tracking variables
+
+### 3. Configuration and Filtering
 - Uses config.py for key settings:
   - APP_NAME and ASPECT for filtering announces (e.g., "atak.cot")
   - ANNOUNCE_INTERVAL for periodic announces (60 seconds)
@@ -25,7 +32,7 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 - Only processes announces matching "{APP_NAME}.{ASPECT}"
 - Nodes must share the same APP_NAME and ASPECT to be discovered as peers
 
-### 2. Announce Management
+### 4. Announce Management
 - Broadcasts our presence on the network
 - Processes announces from other peers
 - Uses responsive announces to quickly form mesh connections
@@ -38,13 +45,12 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 
 This was a critical bug discovered in earlier versions where deriving the hash from public key prevented path discovery. Always use the destination_hash parameter provided to the received_announce() method.
 
-### 3. State Management
+### 5. State Management
 - In-memory state:
   - `peer_map`: Maps hostnames to peer data including identity and destination_hash
-  - `identity_to_hostname`: Maps identity hash strings to hostnames
   - `last_seen`: Tracks when each peer was last seen
 - JSON state file (peer_discovery.json):
-  - Created fresh on startup
+  - Created fresh on startup via cleanup_on_startup()
   - Updated whenever peers are added/updated
   - Updated when stale peers are removed
   - Contains destination hashes needed for link establishment
@@ -61,8 +67,9 @@ This was a critical bug discovered in earlier versions where deriving the hash f
       }
     }
     ```
+- File is stored at `{config.BASE_DIR}/tak_transmission/reticulum_module/new_implementation/peer_discovery.json`
 
-### 4. Peer Maintenance
+### 6. Peer Maintenance
 - Tracks the "last seen" timestamp for each peer
 - Removes stale peers that haven't been seen for PEER_TIMEOUT seconds
 - Uses hostname as the primary identifier for peers
@@ -118,9 +125,9 @@ To enable quick mesh formation, the module implements a responsive announce syst
 - `announce_presence()`: Send announce on the network
 - `add_peer(hostname, identity, destination_hash)`: Add a new peer
 - `get_peer_identity(hostname)`: Get a peer's identity
-- `get_hostname_by_identity(identity)`: Get hostname from identity
 - `clean_stale_peers()`: Remove peers not seen recently
 - `update_peer_status_file()`: Synchronize JSON state file
+- `cleanup_on_startup()`: Reset all peer data when starting up
 - `shutdown()`: Properly shut down the announce thread
 
 ### AnnounceHandler Class
@@ -134,5 +141,7 @@ To enable quick mesh formation, the module implements a responsive announce syst
 - Error handling for malformed announcements
 - Thread-safe operations for concurrent announce handling
 - Proper shutdown mechanism to deregister the announce handler
-- Fresh JSON state file on every boot
+- Fresh JSON state file on every boot via cleanup_on_startup()
 - No state persistence between restarts
+- Comprehensive logging via dedicated logger module
+- Hostname validation before processing

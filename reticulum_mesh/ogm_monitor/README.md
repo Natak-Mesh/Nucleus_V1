@@ -6,7 +6,7 @@ The Enhanced OGM Monitor is a consolidated monitoring solution that tracks mesh 
 
 ## Key Features
 
-- **Identity-Based Node Tracking**: Uses the identity map as the authoritative source of nodes
+- **Hostname-Based Node Tracking**: Uses the hostname mapping as the authoritative source of nodes
 - **Complete Visibility**: Always maintains entries for all remote nodes, even when disconnected
 - **Automatic Mode Switching**: Switches nodes between WiFi and LoRa based on connection quality
 - **Centralized Status File**: Provides a single source of truth for node status
@@ -16,7 +16,7 @@ The Enhanced OGM Monitor is a consolidated monitoring solution that tracks mesh 
 ## Architecture
 
 The Enhanced OGM Monitor:
-1. Loads the identity map to get the list of authorized nodes
+1. Loads the hostname mapping to get the list of authorized nodes
 2. Filters out the local node to avoid self-monitoring
 3. Checks Batman-adv status to determine connectivity of remote nodes
 4. Updates mode information based on connection quality
@@ -24,7 +24,7 @@ The Enhanced OGM Monitor:
 
 ## File Paths
 
-- **Identity Map**: `/home/natak/reticulum_mesh/identity_handler/identity_map.json`
+- **Hostname Map**: `/home/natak/mesh/hostname_mapping.json`
 - **Status Output**: `/home/natak/reticulum_mesh/ogm_monitor/node_status.json`
 
 ## Configuration Parameters
@@ -69,7 +69,7 @@ This implementation consolidates functionality from:
 - `mesh_controller.py`: Mode switching logic
 
 The enhanced monitor uses the same core logic for mode switching but improves on the previous implementation by:
-1. Always tracking all remote nodes from the identity map
+1. Always tracking all remote nodes from the hostname mapping
 2. Excluding the local node to avoid self-monitoring
 3. Including hostname information
 4. Providing more detailed status information
