@@ -53,17 +53,37 @@ class PacketManager:
         self.logger.info("PacketManager running")
         while not self.should_quit:
             try:
-                self.process_outgoing()
-                self.process_retries()
+                # Check if we're allowed to transmit
+                current_time = time.time()
+                can_transmit = current_time - self.last_send_time >= config.SEND_SPACING_DELAY
+                
+                if can_transmit:
+                    # First try to process new outgoing packets
+                    if self.process_outgoing(transmit_allowed=True):
+                        # If we sent something, don't try retries this cycle
+                        pass
+                    else:
+                        # If no new outgoing packets, try retries
+                        self.process_retries(transmit_allowed=True)
+                else:
+                    # Still run the processes but don't allow transmission
+                    self.process_outgoing(transmit_allowed=False)
+                    self.process_retries(transmit_allowed=False)
+                    
                 time.sleep(1)
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}")
 
-    def process_retries(self):
+    def process_retries(self, transmit_allowed=True):
         """Check sent_buffer for failed deliveries and retry if needed"""
         try:
+            # If transmission not allowed, just return
+            if not transmit_allowed:
+                return False
+
             current_time = time.time()
             lora_nodes = self.get_lora_nodes()
+            sent_something = False
 
             # Process each file in delivery status
             for filename, status in list(self.delivery_status.items()):
@@ -108,35 +128,47 @@ class PacketManager:
                         self.logger.error(f"Error reading {filename} for retry: {e}")
                         continue
 
-                    # Retry sending to each failed node
-                    for node in retry_nodes:
-                        try:
-                            if self.peer_discovery:  # Only try if peer_discovery exists
-                                self.logger.info(f"Retrying {filename} to {node} (retry #{status['retry_count'] + 1})")
-                                self.send_to_node(node, data, filename)
-                        except Exception as e:
-                            self.logger.error(f"Error retrying {filename} to {node}: {e}")
-                            continue  # Continue to next node even if this one fails
+                    # Only retry to the first node in this cycle
+                    node = retry_nodes[0]
+                    try:
+                        if self.peer_discovery:  # Only try if peer_discovery exists
+                            self.logger.info(f"Retrying {filename} to {node} (retry #{status['retry_count'] + 1})")
+                            self.send_to_node(node, data, filename)
+                            # Mark this transmission in our tracking
+                            self.delivery_status[filename]["nodes"][node] = True
+                            sent_something = True
+                            
+                            # Only try one packet per cycle
+                            break
+                    except Exception as e:
+                        self.logger.error(f"Error retrying {filename} to {node}: {e}")
 
                     # Update retry tracking
                     status["retry_count"] += 1
                     status["last_retry"] = current_time
 
+            return sent_something
+
         except Exception as e:
             self.logger.error(f"Error processing retries: {e}")
+            return False
 
-    def process_outgoing(self):
-        """Process files in pending directory"""
+    def process_outgoing(self, transmit_allowed=True):
+        """Process files in pending directory, returns True if sent something"""
         try:
             # Get list of files in pending
             pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
             if not pending_files:
-                return
+                return False
+
+            # If transmission not allowed, just check and return
+            if not transmit_allowed:
+                return False
 
             # Get LORA nodes from node_status.json
             lora_nodes = self.get_lora_nodes()
             if not lora_nodes:
-                return
+                return False
 
             # Process oldest file first
             pending_files.sort()
@@ -158,27 +190,24 @@ class PacketManager:
                 "retry_count": 0
             }
 
-            # Send to each valid node
-            for node in valid_nodes:
+            # Send to first valid node only
+            if valid_nodes:
+                node = valid_nodes[0]  # Just send to first node in this cycle
                 try:
                     if self.peer_discovery:  # Only try if peer_discovery exists
-                        # Check if we need to wait before sending to respect radio timing
-                        current_time = time.time()
-                        wait_time = config.SEND_SPACING_DELAY - (current_time - self.last_send_time)
-                        if wait_time > 0:
-                            self.logger.info(f"Waiting {wait_time:.2f} seconds before sending to {node} to respect radio timing")
-                            time.sleep(wait_time)
-                        
                         self.send_to_node(node, data, filename)
+                        # Mark this transmission in our tracking
+                        self.delivery_status[filename]["nodes"][node] = True
                 except Exception as e:
                     self.logger.error(f"Error sending to {node}: {e}")
-                    continue  # Continue to next node even if this one fails
 
             # Move to sent buffer
             os.rename(pending_path, sent_path)
+            return True  # We sent something
 
         except Exception as e:
             self.logger.error(f"Error processing outgoing: {e}")
+            return False
 
     def get_lora_nodes(self):
         """Get list of nodes that are in LORA mode and have peer discovery entries"""
