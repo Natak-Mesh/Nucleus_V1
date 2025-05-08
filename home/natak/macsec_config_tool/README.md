@@ -102,4 +102,4 @@ Each directory contains:
 
 - Always use the br0 IP address without the /24 suffix
 - The hostname should match exactly what the `hostname` command returns
-- Configuration files are automatically synced via the Mesh-V1.7 sync.sh script
+

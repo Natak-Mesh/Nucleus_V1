@@ -40,7 +40,7 @@ class EnhancedOGMMonitor:
         try:
             hostname = socket.gethostname()
             hostname_mapping = self.load_hostname_mapping()
-            for mac, node_info in hostname_mapping.items():
+            for mac, node_info in hostname_mapping["nodes"].items():
                 if node_info.get("hostname") == hostname:
                     return mac
             return None
@@ -147,7 +147,7 @@ class EnhancedOGMMonitor:
         node_status = {}
         
         # Process all nodes from hostname mapping (except local node)
-        for mac, node_info in hostname_nodes.items():
+        for mac, node_info in hostname_nodes["nodes"].items():
             # Skip local node
             if mac == self.local_mac:
                 continue
