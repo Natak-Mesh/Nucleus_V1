@@ -39,6 +39,10 @@ class PacketManager:
         self.last_send_time = 0  # timestamp of last send to respect radio cycle time
         self.last_identity_check = {}  # node -> timestamp of last identity check
         
+        # Logging rate control
+        self.identity_check_counter = 0  # Counter for identity check logging
+        self.previous_lora_node_count = None  # Track previous count of LORA nodes
+        
         # Ensure directories exist
         os.makedirs(self.pending_dir, exist_ok=True)
         os.makedirs(self.sent_buffer, exist_ok=True)
@@ -102,7 +106,10 @@ class PacketManager:
                                     if node not in self.last_identity_check or current_time - self.last_identity_check.get(node, 0) >= 5:
                                         if self.peer_discovery:
                                             try:
-                                                self.logger.info(f"Checking identity for node {node} to prompt receipt processing")
+                                                # Only log every 30th identity check
+                                                self.identity_check_counter += 1
+                                                if self.identity_check_counter % 30 == 0:
+                                                    self.logger.info(f"Checking identity for node {node} to prompt receipt processing")
                                                 self.peer_discovery.get_peer_identity(node)
                                                 self.last_identity_check[node] = current_time
                                             except Exception as e:
@@ -385,9 +392,12 @@ class PacketManager:
                     except Exception as e:
                         self.logger.warning(f"Error checking peer status for node {node}: {e}")
                         continue
-                        
-                # Log the final count of valid nodes
-                self.logger.info(f"Found {len(filtered_nodes)} LORA nodes with peer identities")
+                
+                # Only log when the node count changes
+                node_count = len(filtered_nodes)
+                if self.previous_lora_node_count is None or self.previous_lora_node_count != node_count:
+                    self.logger.info(f"Found {node_count} LORA nodes with peer identities")
+                    self.previous_lora_node_count = node_count
                 return filtered_nodes
                 
         except json.JSONDecodeError as e:
