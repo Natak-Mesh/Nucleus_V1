@@ -1,17 +1,17 @@
 {
-  "timestamp": 1746963157,
+  "timestamp": 1746976259,
   "peers": {
-    "takNode3": {
-      "destination_hash": "213ea5aa5e37fd5321554c6fac94acf0",
-      "last_seen": 1746963090
-    },
     "takNode2": {
       "destination_hash": "cd110101ad7963d48ffe5fd16aa3bc0a",
-      "last_seen": 1746963127
+      "last_seen": 1746976243
+    },
+    "takNode3": {
+      "destination_hash": "213ea5aa5e37fd5321554c6fac94acf0",
+      "last_seen": 1746976259
     },
     "takNode4": {
       "destination_hash": "674f2ec1b1529b86e590978abd4b5ea3",
-      "last_seen": 1746963157
+      "last_seen": 1746976224
     }
   }
 }

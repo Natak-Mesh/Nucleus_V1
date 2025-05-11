@@ -35,7 +35,7 @@ class PacketManager:
         self.should_quit = False
 
         # Delivery tracking
-        self.delivery_status = {}  # filename -> {nodes: {hostname: delivered}, first_sent: time, last_retry: time, retry_count: int}
+        self.delivery_status = {}  # filename -> {nodes: {hostname: {sent: bool, sent_time: time, delivered: bool}}, retry_count: int}
         self.last_send_time = 0  # timestamp of last send to respect radio cycle time
         
         # Ensure directories exist
@@ -58,152 +58,240 @@ class PacketManager:
                 can_transmit = current_time - self.last_send_time >= config.SEND_SPACING_DELAY
                 
                 if can_transmit:
-                    # First try to process new outgoing packets
-                    if self.process_outgoing(transmit_allowed=True):
-                        # If we sent something, don't try retries this cycle
-                        pass
-                    else:
-                        # If no new outgoing packets, try retries
-                        self.process_retries(transmit_allowed=True)
+                    # Process new outgoing packets
+                    self.process_outgoing(transmit_allowed=True)
+                    # Retry logic commented out
+                    # if self.process_outgoing(transmit_allowed=True):
+                    #     # If we sent something, don't try retries this cycle
+                    #     pass
+                    # else:
+                    #     # If no new outgoing packets, try retries
+                    #     self.process_retries(transmit_allowed=True)
                 else:
                     # Still run the processes but don't allow transmission
                     self.process_outgoing(transmit_allowed=False)
-                    self.process_retries(transmit_allowed=False)
+                    # Retry logic commented out
+                    # self.process_retries(transmit_allowed=False)
+                
+                # Process any pending delivery receipts directly in the main loop
+                # Extract just what we need from the original retry logic to process receipts
+                try:
+                    # Process each file in delivery status to keep RNS active
+                    for filename, status in list(self.delivery_status.items()):
+                        # Clean up if max retries reached
+                        if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
+                            self.logger.warning(f"Max retries reached for {filename}")
+                            # Clean up the failed packet
+                            sent_path = os.path.join(self.sent_buffer, filename)
+                            try:
+                                os.remove(sent_path)
+                                del self.delivery_status[filename]
+                                self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
+                            except Exception as e:
+                                self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
+                        else:
+                            # Process delivery status to prompt receipt callbacks
+                            # This loop checks each node entry in a way that encourages
+                            # Reticulum to process its event queue for delivery receipts
+                            for node, node_status in status["nodes"].items():
+                                # Just a simple check that doesn't change any state
+                                if not node_status["delivered"] and node_status["sent"]:
+                                    # This minimal check is sufficient to prompt
+                                    # Reticulum to process any pending proofs for this entry
+                                    continue
+                except Exception as e:
+                    self.logger.error(f"Error processing delivery receipts: {e}")
                     
                 time.sleep(1)
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}")
 
     def process_retries(self, transmit_allowed=True):
-        """Check sent_buffer for failed deliveries and retry if needed"""
-        try:
-            # If transmission not allowed, just return
-            if not transmit_allowed:
-                return False
+        """Check sent_buffer for failed deliveries and retry if needed - COMMENTED OUT"""
+        # RETRY LOGIC COMMENTED OUT
+        return False
+        
+        # try:
+        #     # If transmission not allowed, just return
+        #     if not transmit_allowed:
+        #         return False
 
-            current_time = time.time()
-            lora_nodes = self.get_lora_nodes()
-            sent_something = False
+        #     current_time = time.time()
+        #     lora_nodes = self.get_lora_nodes()
+        #     sent_something = False
 
-            # Process each file in delivery status
-            for filename, status in list(self.delivery_status.items()):
-                # Clean up if max retries reached
-                if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
-                    self.logger.warning(f"Max retries reached for {filename}")
-                    # Clean up the failed packet
-                    sent_path = os.path.join(self.sent_buffer, filename)
-                    try:
-                        os.remove(sent_path)
-                        del self.delivery_status[filename]
-                        self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
-                    except Exception as e:
-                        self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
-                    continue
+        #     # Process each file in delivery status
+        #     for filename, status in list(self.delivery_status.items()):
+        #         # Clean up if max retries reached
+        #         if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
+        #             self.logger.warning(f"Max retries reached for {filename}")
+        #             # Clean up the failed packet
+        #             sent_path = os.path.join(self.sent_buffer, filename)
+        #             try:
+        #                 os.remove(sent_path)
+        #                 del self.delivery_status[filename]
+        #                 self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
+        #             except Exception as e:
+        #                 self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
+        #             continue
 
-                # Calculate backoff delay
-                delay = min(
-                    config.RETRY_INITIAL_DELAY * (config.RETRY_BACKOFF_FACTOR ** status["retry_count"]),
-                    config.RETRY_MAX_DELAY
-                )
+        #         # Calculate backoff delay
+        #         delay = min(
+        #             config.RETRY_INITIAL_DELAY * (config.RETRY_BACKOFF_FACTOR ** status["retry_count"]),
+        #             config.RETRY_MAX_DELAY
+        #         )
 
-                # Check if enough time has passed since last retry
-                if current_time - status["last_retry"] < delay:
-                    continue
+        #         # Check if enough time has passed since last retry
+        #         if current_time - status["last_retry"] < delay:
+        #             continue
 
-                # Get nodes that need retry (not delivered, in LORA mode, and have identity)
-                retry_nodes = [
-                    node for node in lora_nodes
-                    if (node in status["nodes"] and  # Node is in our tracking
-                        not status["nodes"][node] and  # Node hasn't received packet
-                        self.peer_discovery.get_peer_identity(node))  # Node has valid identity
-                ]
+        #         # Get nodes that need retry (not delivered, in LORA mode, and have identity)
+        #         retry_nodes = [
+        #             node for node in lora_nodes
+        #             if (node in status["nodes"] and  # Node is in our tracking
+        #                 not status["nodes"][node] and  # Node hasn't received packet
+        #                 self.peer_discovery.get_peer_identity(node))  # Node has valid identity
+        #         ]
 
-                if retry_nodes:
-                    # Read file data
-                    file_path = os.path.join(self.sent_buffer, filename)
-                    try:
-                        with open(file_path, 'rb') as f:
-                            data = f.read()
-                    except Exception as e:
-                        self.logger.error(f"Error reading {filename} for retry: {e}")
-                        continue
+        #         if retry_nodes:
+        #             # Read file data
+        #             file_path = os.path.join(self.sent_buffer, filename)
+        #             try:
+        #                 with open(file_path, 'rb') as f:
+        #                     data = f.read()
+        #             except Exception as e:
+        #                 self.logger.error(f"Error reading {filename} for retry: {e}")
+        #                 continue
 
-                    # Only retry to the first node in this cycle
-                    node = retry_nodes[0]
-                    try:
-                        if self.peer_discovery:  # Only try if peer_discovery exists
-                            self.logger.info(f"Retrying {filename} to {node} (retry #{status['retry_count'] + 1})")
-                            self.send_to_node(node, data, filename)
-                            # Mark this transmission in our tracking
-                            self.delivery_status[filename]["nodes"][node] = True
-                            sent_something = True
+        #             # Only retry to the first node in this cycle
+        #             node = retry_nodes[0]
+        #             try:
+        #                 if self.peer_discovery:  # Only try if peer_discovery exists
+        #                     self.logger.info(f"Retrying {filename} to {node} (retry #{status['retry_count'] + 1})")
+        #                     self.send_to_node(node, data, filename)
+        #                     # Mark this transmission in our tracking
+        #                     self.delivery_status[filename]["nodes"][node] = True
+        #                     sent_something = True
                             
-                            # Only try one packet per cycle
-                            break
-                    except Exception as e:
-                        self.logger.error(f"Error retrying {filename} to {node}: {e}")
+        #                     # Only try one packet per cycle
+        #                     break
+        #             except Exception as e:
+        #                 self.logger.error(f"Error retrying {filename} to {node}: {e}")
 
-                    # Update retry tracking
-                    status["retry_count"] += 1
-                    status["last_retry"] = current_time
+        #             # Update retry tracking
+        #             status["retry_count"] += 1
+        #             status["last_retry"] = current_time
 
-            return sent_something
+        #     return sent_something
 
-        except Exception as e:
-            self.logger.error(f"Error processing retries: {e}")
-            return False
+        # except Exception as e:
+        #     self.logger.error(f"Error processing retries: {e}")
+        #     return False
 
     def process_outgoing(self, transmit_allowed=True):
-        """Process files in pending directory, returns True if sent something"""
+        """Process files in pending directory, sends to all nodes sequentially"""
         try:
-            # Get list of files in pending
-            pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
-            if not pending_files:
-                return False
-
             # If transmission not allowed, just check and return
             if not transmit_allowed:
                 return False
-
+                
             # Get LORA nodes from node_status.json
             lora_nodes = self.get_lora_nodes()
             if not lora_nodes:
                 return False
-
+                
+            # First process existing files in pending
+            pending_files = [f for f in os.listdir(self.pending_dir) if f.endswith('.zst')]
+            if not pending_files:
+                return False
+                
+            # Filter to get valid nodes with identities
+            valid_nodes = [node for node in lora_nodes if self.peer_discovery.get_peer_identity(node)]
+            if not valid_nodes:
+                return False
+                
             # Process oldest file first
             pending_files.sort()
             filename = pending_files[0]
             pending_path = os.path.join(self.pending_dir, filename)
             sent_path = os.path.join(self.sent_buffer, filename)
-
-            # Read file data
-            with open(pending_path, 'rb') as f:
-                data = f.read()
-
-            # Initialize delivery tracking - only for nodes we have identities for
-            filename = os.path.basename(pending_path)
-            valid_nodes = [node for node in lora_nodes if self.peer_discovery.get_peer_identity(node)]
-            self.delivery_status[filename] = {
-                "nodes": {node: False for node in valid_nodes},
-                "first_sent": time.time(),
-                "last_retry": time.time(),
-                "retry_count": 0
-            }
-
-            # Send to first valid node only
-            if valid_nodes:
-                node = valid_nodes[0]  # Just send to first node in this cycle
-                try:
-                    if self.peer_discovery:  # Only try if peer_discovery exists
-                        self.send_to_node(node, data, filename)
-                        # Mark this transmission in our tracking
-                        self.delivery_status[filename]["nodes"][node] = True
-                except Exception as e:
-                    self.logger.error(f"Error sending to {node}: {e}")
-
-            # Move to sent buffer
-            os.rename(pending_path, sent_path)
-            return True  # We sent something
+            
+            # Check if we have this file in our tracking already
+            if filename not in self.delivery_status:
+                # Read file data
+                with open(pending_path, 'rb') as f:
+                    data = f.read()
+                    
+                # Initialize tracking with per-node structure
+                self.delivery_status[filename] = {
+                    "nodes": {
+                        node: {
+                            "sent": False,        # Have we sent to this node?
+                            "sent_time": 0,       # When did we send to this node?
+                            "delivered": False    # Have we received delivery confirmation?
+                        } for node in valid_nodes
+                    },
+                    "retry_count": 0              # Keep retry_count for backward compatibility
+                }
+                
+                # Find first node that needs sending
+                for node in valid_nodes:
+                    if not self.delivery_status[filename]["nodes"][node]["sent"]:
+                        # Send to this node
+                        try:
+                            if self.peer_discovery and self.send_to_node(node, data, filename):
+                                # Mark as sent and record time
+                                current_time = time.time()
+                                self.delivery_status[filename]["nodes"][node]["sent"] = True
+                                self.delivery_status[filename]["nodes"][node]["sent_time"] = current_time
+                                return True  # We sent something
+                        except Exception as e:
+                            self.logger.error(f"Error sending to {node}: {e}")
+                            
+                # We shouldn't get here unless something failed with all nodes
+                return False
+            else:
+                # We're working with a file already in progress
+                # Read file data
+                with open(pending_path, 'rb') as f:
+                    data = f.read()
+                
+                # Find first node that needs sending
+                for node in valid_nodes:
+                    # Skip nodes we've already sent to
+                    if not self.delivery_status[filename]["nodes"][node]["sent"]:
+                        # Send to this node
+                        try:
+                            if self.peer_discovery and self.send_to_node(node, data, filename):
+                                # Mark as sent and record time
+                                current_time = time.time()
+                                self.delivery_status[filename]["nodes"][node]["sent"] = True
+                                self.delivery_status[filename]["nodes"][node]["sent_time"] = current_time
+                                
+                                # Check if we've sent to all nodes
+                                all_sent = all(self.delivery_status[filename]["nodes"][node]["sent"] 
+                                               for node in self.delivery_status[filename]["nodes"])
+                                
+                                # Only move to sent_buffer after sending to all nodes
+                                if all_sent:
+                                    os.rename(pending_path, sent_path)
+                                    self.logger.info(f"Sent {filename} to all nodes, moved to sent buffer")
+                                
+                                return True  # We sent something
+                        except Exception as e:
+                            self.logger.error(f"Error sending to {node}: {e}")
+                
+                # If we get here, we've either sent to all nodes or all attempts failed
+                # Check if we've sent to all nodes
+                all_sent = all(self.delivery_status[filename]["nodes"][node]["sent"] 
+                               for node in self.delivery_status[filename]["nodes"])
+                
+                # Only move to sent_buffer after sending to all nodes
+                if all_sent and os.path.exists(pending_path):
+                    os.rename(pending_path, sent_path)
+                    self.logger.info(f"Sent {filename} to all nodes, moved to sent buffer")
+                
+                return False  # We didn't send anything new this cycle
 
         except Exception as e:
             self.logger.error(f"Error processing outgoing: {e}")
@@ -298,9 +386,12 @@ class PacketManager:
                         
                     self.logger.info(f"Packet {filename} delivered to {hostname} (RTT: {rtt_str})")
                     if filename in self.delivery_status:
-                        self.delivery_status[filename]["nodes"][hostname] = True
+                        # Update the delivery status
+                        self.delivery_status[filename]["nodes"][hostname]["delivered"] = True
                         # Check if all nodes received
-                        if all(self.delivery_status[filename]["nodes"].values()):
+                        all_delivered = all(node_status["delivered"] for node_status in 
+                                           self.delivery_status[filename]["nodes"].values())
+                        if all_delivered:
                             # Remove file from sent buffer
                             sent_path = os.path.join(self.sent_buffer, filename)
                             try:
