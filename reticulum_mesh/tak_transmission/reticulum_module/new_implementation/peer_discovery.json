@@ -1,17 +1,17 @@
 {
-  "timestamp": 1746976259,
+  "timestamp": 1746981045,
   "peers": {
-    "takNode2": {
-      "destination_hash": "cd110101ad7963d48ffe5fd16aa3bc0a",
-      "last_seen": 1746976243
+    "takNode4": {
+      "destination_hash": "aa409ee58d7907783fe6e3450fc1973f",
+      "last_seen": 1746981045
     },
     "takNode3": {
-      "destination_hash": "213ea5aa5e37fd5321554c6fac94acf0",
-      "last_seen": 1746976259
+      "destination_hash": "3c2fff70be06e778d4412627c73649b3",
+      "last_seen": 1746980990
     },
-    "takNode4": {
-      "destination_hash": "674f2ec1b1529b86e590978abd4b5ea3",
-      "last_seen": 1746976224
+    "takNode2": {
+      "destination_hash": "bfe0fb7b9de01106fc8ed7e9dae3e281",
+      "last_seen": 1746981044
     }
   }
 }

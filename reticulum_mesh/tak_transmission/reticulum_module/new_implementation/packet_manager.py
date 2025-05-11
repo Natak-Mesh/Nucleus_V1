@@ -37,6 +37,7 @@ class PacketManager:
         # Delivery tracking
         self.delivery_status = {}  # filename -> {nodes: {hostname: {sent: bool, sent_time: time, delivered: bool}}, retry_count: int}
         self.last_send_time = 0  # timestamp of last send to respect radio cycle time
+        self.last_identity_check = {}  # node -> timestamp of last identity check
         
         # Ensure directories exist
         os.makedirs(self.pending_dir, exist_ok=True)
@@ -94,11 +95,19 @@ class PacketManager:
                             # This loop checks each node entry in a way that encourages
                             # Reticulum to process its event queue for delivery receipts
                             for node, node_status in status["nodes"].items():
-                                # Just a simple check that doesn't change any state
+                                # Check nodes that haven't been delivered but were sent
                                 if not node_status["delivered"] and node_status["sent"]:
-                                    # This minimal check is sufficient to prompt
-                                    # Reticulum to process any pending proofs for this entry
-                                    continue
+                                    # Rate limit peer identity checks to once every 5 seconds per node
+                                    current_time = time.time()
+                                    if node not in self.last_identity_check or current_time - self.last_identity_check.get(node, 0) >= 5:
+                                        if self.peer_discovery:
+                                            try:
+                                                self.peer_discovery.get_peer_identity(node)
+                                                self.last_identity_check[node] = current_time
+                                            except Exception as e:
+                                                import traceback
+                                                self.logger.error(f"Error getting peer identity for {node}: {e}")
+                                                self.logger.error(f"Traceback: {traceback.format_exc()}")
                 except Exception as e:
                     self.logger.error(f"Error processing delivery receipts: {e}")
                     
