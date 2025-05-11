@@ -102,6 +102,7 @@ class PacketManager:
                                     if node not in self.last_identity_check or current_time - self.last_identity_check.get(node, 0) >= 5:
                                         if self.peer_discovery:
                                             try:
+                                                self.logger.info(f"Checking identity for node {node} to prompt receipt processing")
                                                 self.peer_discovery.get_peer_identity(node)
                                                 self.last_identity_check[node] = current_time
                                             except Exception as e:
@@ -215,8 +216,17 @@ class PacketManager:
                 return False
                 
             # Filter to get valid nodes with identities
-            valid_nodes = [node for node in lora_nodes if self.peer_discovery.get_peer_identity(node)]
+            valid_nodes = []
+            for node in lora_nodes:
+                try:
+                    if self.peer_discovery.get_peer_identity(node):
+                        valid_nodes.append(node)
+                except Exception as e:
+                    # Log error but continue with other nodes
+                    self.logger.warning(f"Error checking identity for node {node}: {e}")
+
             if not valid_nodes:
+                self.logger.warning("No valid nodes found with identities - will try again later")
                 return False
                 
             # Process oldest file first
@@ -265,10 +275,21 @@ class PacketManager:
                 with open(pending_path, 'rb') as f:
                     data = f.read()
                 
+                # Make sure all valid nodes are in our tracking structure
+                # This handles newly discovered nodes since initial send
+                for node in valid_nodes:
+                    if node not in self.delivery_status[filename]["nodes"]:
+                        self.logger.info(f"Adding newly discovered node {node} to tracking for {filename}")
+                        self.delivery_status[filename]["nodes"][node] = {
+                            "sent": False, 
+                            "sent_time": 0,
+                            "delivered": False
+                        }
+                
                 # Find first node that needs sending
                 for node in valid_nodes:
                     # Skip nodes we've already sent to
-                    if not self.delivery_status[filename]["nodes"][node]["sent"]:
+                    if node in self.delivery_status[filename]["nodes"] and not self.delivery_status[filename]["nodes"][node]["sent"]:
                         # Send to this node
                         try:
                             if self.peer_discovery and self.send_to_node(node, data, filename):
@@ -317,11 +338,19 @@ class PacketManager:
                     self.logger.error(f"Node status file is empty: {config.NODE_STATUS_PATH}")
                     return []
                 status = json.loads(content)
-                lora_nodes = [
-                    node["hostname"] 
-                    for node in status.get("nodes", {}).values()
-                    if node.get("mode") == "LORA"
-                ]
+                
+                # More robust parsing of nodes with better error handling
+                for node_data in status.get("nodes", {}).values():
+                    try:
+                        hostname = node_data.get("hostname")
+                        mode = node_data.get("mode")
+                        if hostname and mode == "LORA":
+                            lora_nodes.append(hostname)
+                    except Exception as e:
+                        # Skip problematic nodes but continue processing others
+                        self.logger.warning(f"Error processing node data {node_data}: {e}")
+                        continue
+                
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON in node status file: {e}")
             return []
@@ -333,16 +362,34 @@ class PacketManager:
             # Then try to read peer discovery
             peer_discovery_path = os.path.join(os.path.dirname(config.NODE_STATUS_PATH), 
                 "..", "tak_transmission/reticulum_module/new_implementation/peer_discovery.json")
+            
+            # Check if the file exists before trying to open it
+            if not os.path.exists(peer_discovery_path):
+                self.logger.error(f"Peer discovery file does not exist: {peer_discovery_path}")
+                return []
+                
             with open(peer_discovery_path, 'r') as f:
                 content = f.read()
                 if not content.strip():
                     self.logger.error(f"Peer discovery file is empty: {peer_discovery_path}")
                     return []
+                    
                 peer_status = json.loads(content)
-                return [
-                    node for node in lora_nodes
-                    if node in peer_status.get("peers", {})
-                ]
+                
+                # Return only nodes that are both in LORA mode and have peer discovery entries
+                filtered_nodes = []
+                for node in lora_nodes:
+                    try:
+                        if node in peer_status.get("peers", {}):
+                            filtered_nodes.append(node)
+                    except Exception as e:
+                        self.logger.warning(f"Error checking peer status for node {node}: {e}")
+                        continue
+                        
+                # Log the final count of valid nodes
+                self.logger.info(f"Found {len(filtered_nodes)} LORA nodes with peer identities")
+                return filtered_nodes
+                
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON in peer discovery file: {e}")
             return []
@@ -357,27 +404,39 @@ class PacketManager:
         if current_time - self.last_send_time < config.SEND_SPACING_DELAY:
             return False  # Too soon for radio
 
-        # Get peer identity from peer_discovery
-        peer_identity = self.peer_discovery.get_peer_identity(hostname)
-        if not peer_identity:
-            self.logger.error(f"No identity found for {hostname}")
+        # Get peer identity from peer_discovery with error handling
+        try:
+            peer_identity = self.peer_discovery.get_peer_identity(hostname)
+            if not peer_identity:
+                self.logger.error(f"No identity found for {hostname}")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error getting peer identity for {hostname}: {e}")
             return False
 
-        # Create outbound destination
-        destination = RNS.Destination(
-            peer_identity,
-            RNS.Destination.OUT,
-            RNS.Destination.SINGLE,
-            config.APP_NAME,
-            config.ASPECT
-        )
+        # Create outbound destination with error handling
+        try:
+            destination = RNS.Destination(
+                peer_identity,
+                RNS.Destination.OUT,
+                RNS.Destination.SINGLE,
+                config.APP_NAME,
+                config.ASPECT
+            )
+        except Exception as e:
+            self.logger.error(f"Error creating destination for {hostname}: {e}")
+            return False
 
         # Add log message before sending
         self.logger.info(f"Sending packet {filename} to node {hostname}")
 
         # Create and send packet with proof tracking
-        packet = RNS.Packet(destination, data)
-        receipt = packet.send()
+        try:
+            packet = RNS.Packet(destination, data)
+            receipt = packet.send()
+        except Exception as e:
+            self.logger.error(f"Error creating or sending packet to {hostname}: {e}")
+            return False
 
         if receipt:
             # Set timeout and callbacks
@@ -401,14 +460,16 @@ class PacketManager:
                         all_delivered = all(node_status["delivered"] for node_status in 
                                            self.delivery_status[filename]["nodes"].values())
                         if all_delivered:
-                            # Remove file from sent buffer
+                            # Use only the configured sent buffer path
                             sent_path = os.path.join(self.sent_buffer, filename)
                             try:
                                 os.remove(sent_path)
-                                del self.delivery_status[filename]
                                 self.logger.info(f"All nodes received {filename} - removed from sent buffer")
                             except Exception as e:
                                 self.logger.error(f"Error removing {filename} from sent buffer: {e}")
+                            
+                            # Always clear from tracking even if file wasn't found
+                            del self.delivery_status[filename]
 
             def on_timeout(r):
                 self.logger.warning(f"Packet {filename} to {hostname} timed out")
