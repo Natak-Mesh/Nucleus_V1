@@ -63,59 +63,61 @@ class PacketManager:
                 can_transmit = current_time - self.last_send_time >= config.SEND_SPACING_DELAY
                 
                 if can_transmit:
-                    # Process new outgoing packets
-                    self.process_outgoing(transmit_allowed=True)
-                    # Retry logic commented out
-                    # if self.process_outgoing(transmit_allowed=True):
-                    #     # If we sent something, don't try retries this cycle
-                    #     pass
-                    # else:
-                    #     # If no new outgoing packets, try retries
-                    #     self.process_retries(transmit_allowed=True)
+                    # First try to send new outgoing packets
+                    if not self.process_outgoing(transmit_allowed=True):
+                        # If no new packets were sent, try retries
+                        self.process_retries(transmit_allowed=True)
                 else:
                     # Still run the processes but don't allow transmission
                     self.process_outgoing(transmit_allowed=False)
-                    # Retry logic commented out
-                    # self.process_retries(transmit_allowed=False)
+                    self.process_retries(transmit_allowed=False)
                 
                 # Process any pending delivery receipts directly in the main loop
                 # Extract just what we need from the original retry logic to process receipts
                 try:
                     # Process each file in delivery status to keep RNS active
                     for filename, status in list(self.delivery_status.items()):
-                        # Clean up if max retries reached
-                        if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
-                            self.logger.warning(f"Max retries reached for {filename}")
-                            # Clean up the failed packet
+                        # Check if all nodes are either delivered or reached max retries
+                        all_complete = True
+                        for node, node_status in status["nodes"].items():
+                            if not (node_status["delivered"] or 
+                                   node_status.get("permanently_failed", False) or
+                                   node_status["retry_count"] >= config.RETRY_MAX_ATTEMPTS):
+                                all_complete = False
+                                break
+                        
+                        # If all nodes are complete (delivered or max retries), clean up
+                        if all_complete:
+                            self.logger.info(f"All nodes have either received or reached max retries for {filename}")
+                            # Clean up the packet
                             sent_path = os.path.join(self.sent_buffer, filename)
                             try:
                                 os.remove(sent_path)
                                 del self.delivery_status[filename]
-                                self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
+                                self.logger.info(f"Removed complete packet {filename} from sent buffer")
                             except Exception as e:
-                                self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
-                        else:
-                            # Process delivery status to prompt receipt callbacks
-                            # This loop checks each node entry in a way that encourages
-                            # Reticulum to process its event queue for delivery receipts
-                            for node, node_status in status["nodes"].items():
-                                # Check nodes that haven't been delivered but were sent
-                                if not node_status["delivered"] and node_status["sent"]:
-                                    # Rate limit peer identity checks to once every 5 seconds per node
-                                    current_time = time.time()
-                                    if node not in self.last_identity_check or current_time - self.last_identity_check.get(node, 0) >= 5:
-                                        if self.peer_discovery:
-                                            try:
-                                                # Only log every 30th identity check
-                                                self.identity_check_counter += 1
-                                                if self.identity_check_counter % 30 == 0:
-                                                    self.logger.info(f"Checking identity for node {node} to prompt receipt processing")
-                                                self.peer_discovery.get_peer_identity(node)
-                                                self.last_identity_check[node] = current_time
-                                            except Exception as e:
-                                                import traceback
-                                                self.logger.error(f"Error getting peer identity for {node}: {e}")
-                                                self.logger.error(f"Traceback: {traceback.format_exc()}")
+                                self.logger.error(f"Error removing packet {filename} from sent buffer: {e}")
+                        
+                        # Process delivery receipt callbacks for this file
+                        # This loop checks each node entry to encourage Reticulum to process its event queue
+                        for node, node_status in status["nodes"].items():
+                            # Check nodes that haven't been delivered but were sent
+                            if not node_status["delivered"] and node_status["sent"]:
+                                # Rate limit peer identity checks to once every 5 seconds per node
+                                current_time = time.time()
+                                if node not in self.last_identity_check or current_time - self.last_identity_check.get(node, 0) >= 5:
+                                    if self.peer_discovery:
+                                        try:
+                                            # Only log every 30th identity check
+                                            self.identity_check_counter += 1
+                                            if self.identity_check_counter % 30 == 0:
+                                                self.logger.info(f"Checking identity for node {node} to prompt receipt processing")
+                                            self.peer_discovery.get_peer_identity(node)
+                                            self.last_identity_check[node] = current_time
+                                        except Exception as e:
+                                            import traceback
+                                            self.logger.error(f"Error getting peer identity for {node}: {e}")
+                                            self.logger.error(f"Traceback: {traceback.format_exc()}")
                 except Exception as e:
                     self.logger.error(f"Error processing delivery receipts: {e}")
                     
@@ -124,86 +126,76 @@ class PacketManager:
                 self.logger.error(f"Error in main loop: {e}")
 
     def process_retries(self, transmit_allowed=True):
-        """Check sent_buffer for failed deliveries and retry if needed - COMMENTED OUT"""
-        # RETRY LOGIC COMMENTED OUT
-        return False
-        
-        # try:
-        #     # If transmission not allowed, just return
-        #     if not transmit_allowed:
-        #         return False
+        """Check for packets that need retrying on a per-node basis"""
+        try:
+            # If transmission not allowed, just return
+            if not transmit_allowed:
+                return False
 
-        #     current_time = time.time()
-        #     lora_nodes = self.get_lora_nodes()
-        #     sent_something = False
-
-        #     # Process each file in delivery status
-        #     for filename, status in list(self.delivery_status.items()):
-        #         # Clean up if max retries reached
-        #         if status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
-        #             self.logger.warning(f"Max retries reached for {filename}")
-        #             # Clean up the failed packet
-        #             sent_path = os.path.join(self.sent_buffer, filename)
-        #             try:
-        #                 os.remove(sent_path)
-        #                 del self.delivery_status[filename]
-        #                 self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
-        #             except Exception as e:
-        #                 self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
-        #             continue
-
-        #         # Calculate backoff delay
-        #         delay = min(
-        #             config.RETRY_INITIAL_DELAY * (config.RETRY_BACKOFF_FACTOR ** status["retry_count"]),
-        #             config.RETRY_MAX_DELAY
-        #         )
-
-        #         # Check if enough time has passed since last retry
-        #         if current_time - status["last_retry"] < delay:
-        #             continue
-
-        #         # Get nodes that need retry (not delivered, in LORA mode, and have identity)
-        #         retry_nodes = [
-        #             node for node in lora_nodes
-        #             if (node in status["nodes"] and  # Node is in our tracking
-        #                 not status["nodes"][node] and  # Node hasn't received packet
-        #                 self.peer_discovery.get_peer_identity(node))  # Node has valid identity
-        #         ]
-
-        #         if retry_nodes:
-        #             # Read file data
-        #             file_path = os.path.join(self.sent_buffer, filename)
-        #             try:
-        #                 with open(file_path, 'rb') as f:
-        #                     data = f.read()
-        #             except Exception as e:
-        #                 self.logger.error(f"Error reading {filename} for retry: {e}")
-        #                 continue
-
-        #             # Only retry to the first node in this cycle
-        #             node = retry_nodes[0]
-        #             try:
-        #                 if self.peer_discovery:  # Only try if peer_discovery exists
-        #                     self.logger.info(f"Retrying {filename} to {node} (retry #{status['retry_count'] + 1})")
-        #                     self.send_to_node(node, data, filename)
-        #                     # Mark this transmission in our tracking
-        #                     self.delivery_status[filename]["nodes"][node] = True
-        #                     sent_something = True
+            current_time = time.time()
+            lora_nodes = self.get_lora_nodes()
+            sent_something = False
+            
+            # Process each file in delivery status
+            for filename, status in list(self.delivery_status.items()):
+                # Skip if we've hit the radio spacing limit
+                if current_time - self.last_send_time < config.SEND_SPACING_DELAY:
+                    return sent_something
+                    
+                # Read file data (only once per file)
+                file_path = os.path.join(self.sent_buffer, filename)
+                try:
+                    with open(file_path, 'rb') as f:
+                        data = f.read()
+                except Exception as e:
+                    self.logger.error(f"Error reading {filename} for retry: {e}")
+                    continue
+                    
+                # Check each node that might need retry
+                for node, node_status in status["nodes"].items():
+                    # Only retry if node is in LORA mode, was sent to, but not delivered
+                    if (node in lora_nodes and 
+                        node_status["sent"] and 
+                        not node_status["delivered"]):
+                        
+                        # Skip if max retries reached for this node
+                        if node_status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
+                            continue
                             
-        #                     # Only try one packet per cycle
-        #                     break
-        #             except Exception as e:
-        #                 self.logger.error(f"Error retrying {filename} to {node}: {e}")
+                        # Calculate backoff delay with jitter
+                        base_delay = min(
+                            config.RETRY_INITIAL_DELAY * (config.RETRY_BACKOFF_FACTOR ** node_status["retry_count"]),
+                            config.RETRY_MAX_DELAY
+                        )
+                        import random
+                        jitter_factor = 1.0 + random.uniform(-config.RETRY_JITTER, config.RETRY_JITTER)
+                        actual_delay = base_delay * jitter_factor
+                        
+                        # Check if enough time has passed since last retry
+                        if current_time - node_status["last_retry_time"] >= actual_delay:
+                            # Try to get peer identity
+                            if not self.peer_discovery or not self.peer_discovery.get_peer_identity(node):
+                                continue
+                                
+                            # Retry sending to this node
+                            try:
+                                self.logger.info(f"Retrying {filename} to {node} (retry #{node_status['retry_count'] + 1})")
+                                if self.send_to_node(node, data, filename):
+                                    # Update retry tracking for this node
+                                    node_status["retry_count"] += 1
+                                    node_status["last_retry_time"] = current_time
+                                    sent_something = True
+                                    
+                                    # Only do one retry per cycle to respect radio timings
+                                    return True
+                            except Exception as e:
+                                self.logger.error(f"Error retrying {filename} to {node}: {e}")
+                                
+            return sent_something
 
-        #             # Update retry tracking
-        #             status["retry_count"] += 1
-        #             status["last_retry"] = current_time
-
-        #     return sent_something
-
-        # except Exception as e:
-        #     self.logger.error(f"Error processing retries: {e}")
-        #     return False
+        except Exception as e:
+            self.logger.error(f"Error processing retries: {e}")
+            return False
 
     def process_outgoing(self, transmit_allowed=True):
         """Process files in pending directory, sends to all nodes sequentially"""
@@ -487,15 +479,36 @@ class PacketManager:
 
             def on_timeout(r):
                 self.logger.warning(f"Packet {filename} to {hostname} timed out")
-                if filename in self.delivery_status:
-                    # Remove the file from sent buffer
-                    sent_path = os.path.join(self.sent_buffer, filename)
-                    try:
-                        os.remove(sent_path)
-                        del self.delivery_status[filename]
-                        self.logger.info(f"Removed timed out packet {filename} from sent buffer")
-                    except Exception as e:
-                        self.logger.error(f"Error removing timed out packet {filename} from sent buffer: {e}")
+                if filename in self.delivery_status and hostname in self.delivery_status[filename]["nodes"]:
+                    node_status = self.delivery_status[filename]["nodes"][hostname]
+                    
+                    # Check if we've already reached max retries for this node
+                    if node_status["retry_count"] >= config.RETRY_MAX_ATTEMPTS:
+                        self.logger.warning(f"Max retries reached for {filename} to {hostname}")
+                        # Mark this node as permanently failed (for tracking)
+                        node_status["permanently_failed"] = True
+                        
+                        # Check if all nodes have either been delivered or reached max retries
+                        all_complete = True
+                        for ns in self.delivery_status[filename]["nodes"].values():
+                            if not (ns["delivered"] or ns.get("permanently_failed", False)):
+                                all_complete = False
+                                break
+                                
+                        # If all nodes are complete, clean up the file
+                        if all_complete:
+                            sent_path = os.path.join(self.sent_buffer, filename)
+                            try:
+                                os.remove(sent_path)
+                                del self.delivery_status[filename]
+                                self.logger.info(f"All nodes either received or permanently failed for {filename} - removed from sent buffer")
+                            except Exception as e:
+                                self.logger.error(f"Error removing {filename} from sent buffer: {e}")
+                    else:
+                        # If we haven't reached max retries, just mark as needing retry
+                        # The packet remains in sent_buffer directory
+                        self.logger.info(f"Marking {filename} to {hostname} for retry after timeout")
+                        # We don't increment retry_count here - that happens in process_retries when we actually retry
 
             receipt.set_delivery_callback(on_delivery)
             receipt.set_timeout_callback(on_timeout)
