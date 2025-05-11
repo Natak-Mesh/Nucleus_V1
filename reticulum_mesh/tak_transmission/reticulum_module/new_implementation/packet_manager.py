@@ -36,7 +36,6 @@ class PacketManager:
 
         # Delivery tracking
         self.delivery_status = {}  # filename -> {nodes: {hostname: delivered}, first_sent: time, last_retry: time, retry_count: int}
-        self.attempted_nodes = {}  # filename -> set of nodes that have been attempted
         self.last_send_time = 0  # timestamp of last send to respect radio cycle time
         
         # Ensure directories exist
@@ -96,9 +95,6 @@ class PacketManager:
                     try:
                         os.remove(sent_path)
                         del self.delivery_status[filename]
-                        # Clean up attempted nodes tracking
-                        if filename in self.attempted_nodes:
-                            del self.attempted_nodes[filename]
                         self.logger.info(f"Removed failed packet {filename} from sent buffer after max retries")
                     except Exception as e:
                         self.logger.error(f"Error removing failed packet {filename} from sent buffer: {e}")
@@ -114,55 +110,24 @@ class PacketManager:
                 if current_time - status["last_retry"] < delay:
                     continue
 
-                # Read file data
-                file_path = os.path.join(self.sent_buffer, filename)
-                try:
-                    with open(file_path, 'rb') as f:
-                        data = f.read()
-                except Exception as e:
-                    self.logger.error(f"Error reading {filename} for processing: {e}")
-                    continue
-                
-                # First, find nodes that have never been attempted
-                first_attempt_nodes = [
-                    node for node in lora_nodes
-                    if (node in status["nodes"] and  # Node is in our tracking
-                        not status["nodes"][node] and  # Node hasn't received packet
-                        self.peer_discovery.get_peer_identity(node) and  # Node has valid identity
-                        node not in self.attempted_nodes.get(filename, set()))  # Node has not been attempted
-                ]
-
-                # Try first attempt nodes first
-                if first_attempt_nodes:
-                    node = first_attempt_nodes[0]
-                    try:
-                        if self.peer_discovery:
-                            self.logger.info(f"Sending packet {filename} to node {node}")  # Not a retry
-                            self.send_to_node(node, data, filename)
-                            # Mark this transmission in our tracking
-                            self.delivery_status[filename]["nodes"][node] = True
-                            # Add to attempted nodes
-                            self.attempted_nodes.setdefault(filename, set()).add(node)
-                            sent_something = True
-                            
-                            # Only try one packet per cycle
-                            break
-                    except Exception as e:
-                        self.logger.error(f"Error sending {filename} to {node}: {e}")
-                    
-                    # No need to update retry tracking for first attempts
-                    continue
-                
-                # If no first attempts, find nodes that need retry
+                # Get nodes that need retry (not delivered, in LORA mode, and have identity)
                 retry_nodes = [
                     node for node in lora_nodes
                     if (node in status["nodes"] and  # Node is in our tracking
                         not status["nodes"][node] and  # Node hasn't received packet
-                        self.peer_discovery.get_peer_identity(node) and  # Node has valid identity
-                        node in self.attempted_nodes.get(filename, set()))  # Node has been attempted
+                        self.peer_discovery.get_peer_identity(node))  # Node has valid identity
                 ]
 
                 if retry_nodes:
+                    # Read file data
+                    file_path = os.path.join(self.sent_buffer, filename)
+                    try:
+                        with open(file_path, 'rb') as f:
+                            data = f.read()
+                    except Exception as e:
+                        self.logger.error(f"Error reading {filename} for retry: {e}")
+                        continue
+
                     # Only retry to the first node in this cycle
                     node = retry_nodes[0]
                     try:
@@ -233,8 +198,6 @@ class PacketManager:
                         self.send_to_node(node, data, filename)
                         # Mark this transmission in our tracking
                         self.delivery_status[filename]["nodes"][node] = True
-                        # Track that we've attempted this node
-                        self.attempted_nodes[filename] = {node}
                 except Exception as e:
                     self.logger.error(f"Error sending to {node}: {e}")
 
@@ -312,6 +275,9 @@ class PacketManager:
             config.ASPECT
         )
 
+        # Add log message before sending
+        self.logger.info(f"Sending packet {filename} to node {hostname}")
+
         # Create and send packet with proof tracking
         packet = RNS.Packet(destination, data)
         receipt = packet.send()
@@ -340,9 +306,6 @@ class PacketManager:
                             try:
                                 os.remove(sent_path)
                                 del self.delivery_status[filename]
-                                # Clean up attempted nodes tracking
-                                if filename in self.attempted_nodes:
-                                    del self.attempted_nodes[filename]
                                 self.logger.info(f"All nodes received {filename} - removed from sent buffer")
                             except Exception as e:
                                 self.logger.error(f"Error removing {filename} from sent buffer: {e}")
@@ -355,9 +318,6 @@ class PacketManager:
                     try:
                         os.remove(sent_path)
                         del self.delivery_status[filename]
-                        # Clean up attempted nodes tracking
-                        if filename in self.attempted_nodes:
-                            del self.attempted_nodes[filename]
                         self.logger.info(f"Removed timed out packet {filename} from sent buffer")
                     except Exception as e:
                         self.logger.error(f"Error removing timed out packet {filename} from sent buffer: {e}")
