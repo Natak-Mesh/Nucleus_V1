@@ -254,7 +254,9 @@ class PacketManager:
                         node: {
                             "sent": False,        # Have we sent to this node?
                             "sent_time": 0,       # When did we send to this node?
-                            "delivered": False    # Have we received delivery confirmation?
+                            "delivered": False,   # Have we received delivery confirmation?
+                            "retry_count": 0,     # How many times we've retried this node
+                            "last_retry_time": 0  # When we last retried this node
                         } for node in valid_nodes
                     },
                     "retry_count": 0              # Keep retry_count for backward compatibility
@@ -290,7 +292,9 @@ class PacketManager:
                         self.delivery_status[filename]["nodes"][node] = {
                             "sent": False, 
                             "sent_time": 0,
-                            "delivered": False
+                            "delivered": False,
+                            "retry_count": 0,     # How many times we've retried this node
+                            "last_retry_time": 0  # When we last retried this node
                         }
                 
                 # Find first node that needs sending
