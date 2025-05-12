@@ -171,8 +171,11 @@ class PacketManager:
                         jitter_factor = 1.0 + random.uniform(-config.RETRY_JITTER, config.RETRY_JITTER)
                         actual_delay = base_delay * jitter_factor
                         
-                        # Check if enough time has passed since last retry
-                        if current_time - node_status["last_retry_time"] >= actual_delay:
+                        # Check if enough time has passed before retry
+                        # Use sent_time for the first retry, last_retry_time for subsequent retries
+                        reference_time = node_status["sent_time"] if node_status["retry_count"] == 0 else node_status["last_retry_time"]
+                        
+                        if current_time - reference_time >= actual_delay:
                             # Try to get peer identity
                             if not self.peer_discovery or not self.peer_discovery.get_peer_identity(node):
                                 continue

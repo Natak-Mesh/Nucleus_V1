@@ -13,9 +13,13 @@ import threading
 import json
 import subprocess
 import logger
+import takproto
 from collections import deque
 from typing import Dict, Tuple
 from utils.compression import compress_cot_packet, decompress_cot_packet
+
+# Rate limiting for position updates (seconds)
+POSITION_UPDATE_RATE_LIMIT = 60  # Process position updates once per minute
 
 # LoraOutSocketManager from atak_relay_resilient.py
 class LoraOutSocketManager:
@@ -115,6 +119,9 @@ class ATAKHandler:
         # IP tracking
         self.local_ips = set()
         self.remote_ips = set()
+        
+        # Position update rate limiting
+        self.last_position_update_time = 0  # Timestamp of last position update
         
         # Directory setup
         self.pending_dir = f"{shared_dir}/pending"
@@ -280,12 +287,54 @@ class ATAKHandler:
     def process_packet(self, data: bytes, src_port: int = None) -> None:
         """Process an ATAK packet for transmission"""
         try:
+            # Debug: Log packet reception
+            self.logger.info(f"DEBUG: Processing packet from port {src_port}, size: {len(data)} bytes")
+            
+            # Check if this is a position update (a-f-G-U-C) using takproto
+            self.logger.info(f"DEBUG: Identifying packet type using takproto")
+            is_position_update = False
+
+            try:
+                parsed_data = takproto.parse_proto(data)
+                if parsed_data and hasattr(parsed_data, 'cotEvent') and hasattr(parsed_data.cotEvent, 'type'):
+                    event_type = parsed_data.cotEvent.type
+                    is_position_update = 'a-f-G-U-C' in event_type
+                    self.logger.info(f"DEBUG: Event type: {event_type}")
+            except Exception as e:
+                self.logger.info(f"DEBUG: Error parsing packet: {str(e)}")
+                
+            self.logger.info(f"DEBUG: Is position update: {is_position_update}")
+            
+            if is_position_update:
+                # Apply basic rate limiting
+                current_time = time.time()
+                self.logger.info(f"DEBUG: Position update time diff: {current_time - self.last_position_update_time}")
+                
+                if current_time - self.last_position_update_time < POSITION_UPDATE_RATE_LIMIT:
+                    # Skip this position update (rate limited)
+                    self.logger.info(f"DEBUG: Skipping position update (rate limited)")
+                    return
+                
+                # Update timestamp
+                self.last_position_update_time = current_time
+                self.logger.info(f"DEBUG: Position update timestamp updated")
+            else:
+                self.logger.info(f"DEBUG: Non-position packet, bypassing rate limiting")
+            
+            self.logger.info(f"DEBUG: Attempting to compress packet")
             compressed = compress_cot_packet(data)
             if not compressed:
+                self.logger.info(f"DEBUG: Compression failed, discarding packet")
                 return
             
+            self.logger.info(f"DEBUG: Packet compressed, size: {len(compressed)} bytes")
+            
             # Check for duplicates before writing
-            if self.is_duplicate(compressed):
+            is_duplicate = self.is_duplicate(compressed)
+            self.logger.info(f"DEBUG: Is duplicate: {is_duplicate}")
+            
+            if is_duplicate:
+                self.logger.info(f"DEBUG: Discarding duplicate packet")
                 return
             
             # Check if any nodes are in non-WIFI mode
