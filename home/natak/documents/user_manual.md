@@ -11,18 +11,19 @@
 
 ## System Overview
 
-The Dual-Mode Mesh Network System is a resilient communication platform that combines IP-based 802.11s mesh networking with long-range Reticulum/LoRa capabilities. This hybrid approach provides both high-bandwidth local connectivity and long-range communication when needed.
+The Dual-Mode Mesh Network System is a resilient communication platform that combines IP-based 802.11s mesh networking with long-range Reticulum/LoRa capabilities. This hybrid approach provides both high-bandwidth local connectivity and long-range communication when needed. The system is designed as a general-purpose platform that can support a wide range of applications and devices, not limited to any specific use case.
 
 ### Key Components
 
 #### IP-Based 802.11s with Batman-adv
 
-The system uses the Batman-adv (Better Approach To Mobile Ad-hoc Networking) protocol to create a layer 2 mesh network over 802.11s wireless connections. This provides:
+The system uses the Batman-adv (Better Approach To Mobile Ad-hoc Networking) protocol to create a layer 2 mesh network over 802.11s wireless connections. This general-purpose IP network provides:
 
 - Self-healing mesh topology
 - Automatic route discovery and optimization
 - Seamless client roaming
 - Layer 2 bridging capabilities
+- Standard IP connectivity for any connected device
 
 #### MACsec Security Layer
 
@@ -35,14 +36,14 @@ All mesh traffic is encrypted using MACsec (IEEE 802.1AE) to provide:
 
 #### Reticulum/LoRa Fallback
 
-When WiFi mesh connectivity is degraded or unavailable, the system automatically switches to Reticulum over LoRa. This fallback mechanism is primarily designed to support ATAK communication when the WiFi mesh is unavailable. The Reticulum/LoRa component provides:
+When WiFi mesh connectivity is degraded or unavailable, the system automatically switches to Reticulum over LoRa. The current implementation of this fallback mechanism is primarily designed to support ATAK communication when the WiFi mesh is unavailable. The Reticulum/LoRa component provides:
 
 - Long-range communication (up to several kilometers)
-- Low-bandwidth but reliable ATAK message transmission
+- Low-bandwidth but reliable messaging
 - Resilient peer discovery
 - End-to-end encryption
 
-**Note**: The Reticulum/LoRa component is specifically designed for ATAK packet transmission. Without ATAK, the Reticulum component will maintain connectivity between nodes but does not provide general-purpose networking capabilities.
+**Note**: While the current reticulum_mesh module is specifically designed for ATAK packet transmission, the system includes a full Reticulum installation that can be used for other applications. See the "General Purpose Connectivity" section for more information on using Reticulum for other purposes.
 
 #### ATAK Integration
 
@@ -279,6 +280,40 @@ When the system detects ATAK packets and nodes are in LORA mode, it automaticall
 2. Transmits them via Reticulum over LoRa
 3. Decompresses them on the receiving end
 4. Forwards them to the local ATAK instance
+
+### General Purpose Connectivity
+
+While the system includes specific integration with ATAK, it is designed as a general-purpose connectivity platform that can support a wide range of applications and devices.
+
+#### IP Mesh Network for Any Device
+
+The Batman-adv mesh network provides standard IP connectivity that can be used by any IP-capable device:
+
+- **Standard IP Applications**: Any application that uses IP networking (web browsing, file sharing, VoIP, etc.) can operate over the mesh network
+- **Device Connectivity**: Any device that can connect to a network (laptops, smartphones, IoT devices, etc.) can join the mesh through any node
+- **Transparent Routing**: Batman-adv automatically handles routing between nodes, making the entire mesh appear as a single network segment
+- **Bridged Connectivity**: The br0 bridge interface allows devices connected via Ethernet or WiFi client mode to communicate seamlessly with the mesh
+
+To connect a device to the mesh network:
+1. Connect to any mesh node via WiFi or Ethernet
+2. The device will receive an IP address via DHCP
+3. The device can now communicate with any other device on the mesh
+
+#### Extended Reticulum Usage
+
+While the current reticulum_mesh module is specifically designed for ATAK integration, the system includes a full Reticulum installation that can be used for other applications:
+
+- **Reticulum Applications**: The system can run other Reticulum-based applications such as Sideband or Mesh Chat
+- **TCP Interface**: Reticulum can be configured with a TCP interface to allow other devices to connect and use Reticulum services
+- **Custom Applications**: Developers can create custom applications using the Reticulum API
+
+Advanced users can configure Reticulum for additional use cases:
+- Configure a TCP interface to allow other devices to connect to Reticulum
+- Run additional Reticulum applications alongside the ATAK integration
+- Develop custom applications using the Reticulum API
+- Reconfigure the system to let Reticulum use the WiFi interface directly for a full Reticulum device
+
+**Note**: Extended Reticulum usage may require additional configuration beyond the scope of this manual. Refer to the Reticulum documentation for more information.
 
 ## Troubleshooting
 
