@@ -67,10 +67,17 @@ The system automatically switches between these modes based on connectivity qual
 
 ### Required Components
 
-- **Raspberry Pi 4** (with at least 2GB RAM) - Required specifically for the custom kernel that supports MACsec encryption
-- **Storage** (minimum 16GB microSD card)
-- **Power Supply** (battery or fixed)
-- **Weatherproof Enclosure** (for outdoor deployments)
+- **Raspberry Pi 4** (4GB RAM recommended, minimum 2GB) - The system has been tested and built on the Pi 4 with 4GB RAM. A custom kernel is used that supports MACsec encryption.
+
+- **Storage** - 32GB microSD card recommended. While the system may function with smaller capacity cards, 32GB provides ample space for the operating system, applications, and data storage.
+
+- **Radio Components**:
+  - **WiFi Adapter** - USB WiFi adapter supporting 802.11s mesh mode with appropriate antenna
+  - **RNode-compatible LoRa Device** - LoRa transceiver with RNode firmware installed. Users must verify their LoRa device has compatible RNode firmware for proper integration with the Reticulum network stack.
+
+- **Power Supply** - 5V power supply for the Raspberry Pi 4. Standard Raspberry Pi power supply (5V/3A) recommended for stable operation.
+
+- **Optional: Weatherproof Enclosure** - For outdoor or harsh environment deployments
 
 ### Modular Radio Components
 
@@ -89,108 +96,101 @@ As this is an open-source project, the radio components are designed to be modul
 
 ### Mesh Network Configuration
 
-The primary configuration file for the mesh network is located at:
+**File Location**: `/home/natak/mesh/mesh_config.env`
 
-```
-/home/natak/mesh/mesh_config.env
-```
+**Key Variables**:
+- `MESH_NAME`: Defines the mesh network name (must be identical across all nodes)
+- `MESH_CHANNEL`: Specifies the WiFi channel for mesh communication
+  - 2.4 GHz channels (1-11): Better range, more potential interference
+  - 5 GHz channels: Higher bandwidth, shorter range
+  - DFS channels (52-144): Require radar detection, may not be available in all locations
 
-This file contains the following key settings:
+**Channel Setup Note**: When changing channels, uncomment the desired channel and ensure you comment out the previously used channel. All nodes in the mesh must use the same channel to communicate with each other.
 
-- **MESH_NAME**: The name of the mesh network (all devices must use the same name)
-- **MESH_CHANNEL**: The WiFi channel to use for mesh communication
-
-Example configuration:
-
-```
-MESH_NAME=natak_mesh
-MESH_CHANNEL=11  # 2462 MHz (2.0 dBm)
-```
-
-#### Changing Mesh Name
-
-To change the mesh network name:
-
-1. Edit the mesh_config.env file:
-   ```
-   nano /home/natak/mesh/mesh_config.env
-   ```
-
-2. Modify the MESH_NAME parameter:
-   ```
-   MESH_NAME=your_new_mesh_name
-   ```
-
-3. Save the file and exit (Ctrl+X, Y, Enter)
-
-4. Restart the mesh service:
-   ```
-   sudo systemctl restart mesh-startup
-   ```
-
-#### Changing Mesh Channel
-
-The system supports various WiFi channels in both 2.4 GHz and 5 GHz bands. To change the channel:
-
-1. Edit the mesh_config.env file:
-   ```
-   nano /home/natak/mesh/mesh_config.env
-   ```
-
-2. Comment out the current MESH_CHANNEL line by adding a # at the beginning
-3. Uncomment the desired channel by removing the # at the beginning
-4. Save the file and exit (Ctrl+X, Y, Enter)
-5. Restart the mesh service:
-   ```
-   sudo systemctl restart mesh-startup
-   ```
-
-**Note**: When selecting a channel, consider:
-- 2.4 GHz channels (1-11) offer better range but may have more interference
-- 5 GHz channels offer higher bandwidth but shorter range
-- DFS channels (52-144) require radar detection and may not be available in all locations
+**After Configuration Changes**: Restart the mesh service with `sudo systemctl restart mesh-startup`
 
 ### Node Configuration with MACsec Config Tool
 
-The system uses a dedicated MACsec configuration tool to generate the necessary configuration files for node management and secure communication. The tool automatically generates:
+**Tool Location**: `/home/natak/macsec_config_tool/Macsec_config_generator.py`
 
-- **hostname_mapping.json**: Maps MAC addresses to hostnames and IP addresses
-- **macsec.sh**: Contains encryption keys and peer configurations
+**Generated Files**:
+- `hostname_mapping.json`: Maps MAC addresses to hostnames and IP addresses
+- `macsec.sh`: Contains encryption keys and peer configurations
 
-**Important**: These files are generated automatically and should not be modified manually. Incorrect modifications can break the mesh network's security and functionality.
+**Important**: These files are generated automatically by the configuration tool and should not be modified manually. Incorrect modifications can break the mesh network's security and functionality.
 
-#### Adding a New Node
-
-To add a new node to the network, use the MACsec configuration tool:
-
-```
-cd /home/natak/macsec_config_tool
-python3 Macsec_config_generator.py
-```
-
-The tool will guide you through the process of adding a new node, generating the appropriate keys, and updating the configuration files. After the configuration is generated, restart the mesh service:
-
-```
-sudo systemctl restart mesh-startup
-```
+**Adding Nodes**: Run the MACsec configuration tool and follow the prompts. The tool provides detailed instructions during the node addition process. After configuration, restart the mesh service.
 
 ### Reticulum Configuration
 
-The Reticulum stack is configured in:
+**File Location**: `/home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/config.py`
 
-```
-/home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/config.py
-```
+**Key Variables**:
+- `APP_NAME`: Application identifier (functions as the Reticulum mesh name)
+- `ASPECT`: Communication aspect (functions as the Reticulum mesh password)
+- `ANNOUNCE_INTERVAL`: Frequency of presence announcements (seconds)
+- `PEER_TIMEOUT`: Time before considering a peer offline (seconds)
+- `RETRY_MAX_ATTEMPTS`: Maximum packet retry attempts
+- `RETRY_INITIAL_DELAY`: Base delay for first retry (seconds)
+- `RETRY_BACKOFF_FACTOR`: Multiplier for delay increase
+- `RETRY_MAX_DELAY`: Maximum allowed delay between retries (seconds)
+- `RETRY_JITTER`: Randomness added to calculated delay
 
-Key settings include:
+**After Configuration Changes**: Restart the Reticulum stack with `sudo systemctl restart reticulum-stack`
 
-- **APP_NAME**: Application identifier
-- **ASPECT**: Communication aspect
-- **ANNOUNCE_INTERVAL**: How often to announce presence (seconds)
-- **PEER_TIMEOUT**: Time before considering a peer offline (seconds)
-- **RETRY_MAX_ATTEMPTS**: Maximum packet retry attempts
+### WiFi Hotspot Configuration
 
-Most users will not need to modify these settings, but they can be adjusted for specific deployment scenarios.
+**File Location**: `/etc/hostapd/hostapd.conf`
+
+**Purpose**: Configures the WiFi access point that allows client devices to connect to the mesh node
+
+**After Configuration Changes**: Restart the hostapd service with `sudo systemctl restart hostapd`
+
+### Network Interface Configuration
+
+**File Location**: `/etc/systemd/network/`
+
+**Key Files**:
+- `br0.netdev`: Bridge device configuration
+- `br0.network`: Bridge network configuration
+- `eth0.network`: Ethernet interface configuration
+- `wlan0.network`: WiFi interface configuration
+
+**Purpose**: Configures the node's primary IP addressing and network bridge setup
+
+**After Configuration Changes**: Restart the systemd-networkd service with `sudo systemctl restart systemd-networkd`
+
+### Batman-adv Configuration
+
+**File Location**: `/home/natak/mesh/batmesh.sh`
+
+**Key Parameters**:
+- `OGM Interval`: 1000ms for better adaptation to mobility
+- `Hop Penalty`: 40 to favor stronger direct links in poor RF conditions
+- `Network Coding`: Enabled to improve throughput in challenging environments
+- `Distributed ARP Table`: Enabled to reduce broadcast traffic
+
+**After Configuration Changes**: Restart the mesh service with `sudo systemctl restart mesh-startup`
+
+### Mode Transition Configuration
+
+**File Location**: `/home/natak/reticulum_mesh/ogm_monitor/enhanced_ogm_monitor.py`
+
+**Key Parameters**:
+- `FAILURE_THRESHOLD`: Time without OGMs to consider a failure (seconds)
+- `FAILURE_COUNT`: Consecutive failures to switch to LORA mode
+- `RECOVERY_COUNT`: Consecutive good readings to switch back to WIFI mode
+
+**After Configuration Changes**: Restart the Reticulum stack with `sudo systemctl restart reticulum-stack`
+
+### ATAK Rate Limiting
+
+**File Location**: `/home/natak/reticulum_mesh/tak_transmission/atak_module/atak_handler.py`
+
+**Key Parameter**:
+- `POSITION_UPDATE_RATE_LIMIT`: Minimum time between position updates (default: 60 seconds)
+
+**After Configuration Changes**: Restart the Reticulum stack with `sudo systemctl restart reticulum-stack`
 
 ## Operation
 
