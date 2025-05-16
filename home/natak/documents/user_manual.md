@@ -85,7 +85,7 @@ As this is an open-source project, the radio components are designed to be modul
 
 - **WiFi Adapter** - Any USB adapter supporting 802.11s mesh mode
   - The system connects via USB, allowing for easy replacement with compatible alternatives
-  - Recommended: Adapters with external antenna connectors for better range
+  - Recommended: Adapters with in kernel drivers 
 
 - **LoRa Transceiver/Reticulum Node** - USB-connected LoRa device
   - Can be replaced with other LoRa transceivers compatible with Reticulum
@@ -142,7 +142,8 @@ As this is an open-source project, the radio components are designed to be modul
 
 **File Location**: `/etc/hostapd/hostapd.conf`
 
-**Purpose**: Configures the WiFi access point that allows client devices to connect to the mesh node
+**Purpose**: Configures the WiFi access point that allows client devices to connect to the mesh node.
+Note: access point name is set here
 
 **After Configuration Changes**: Restart the hostapd service with `sudo systemctl restart hostapd`
 
@@ -251,7 +252,7 @@ To access the mesh monitor interface:
 
 1. Connect to the mesh network
 2. Open a web browser
-3. Navigate to the mesh monitor web page (URL will be provided during system setup)
+3. Navigate to the mesh monitor web page at <node IP>:5000
 
 The web interface provides a visual representation of:
 - Current mode of each node (WIFI or LORA)
@@ -270,7 +271,7 @@ The system integrates with ATAK through the following mechanisms:
 
 This dual-mode capability is a key feature of the system, allowing ATAK to maintain communication even when WiFi connectivity is degraded or unavailable. The Reticulum/LoRa component is specifically designed to handle ATAK packet transmission and does not provide general-purpose networking for other applications.
 
-ATAK should be configured to use the following multicast addresses:
+ATAK EUD (via the network setting menu) should be configured to use the following multicast addresses:
 
 - Primary: 224.10.10.1:17012
 - Secondary: 239.2.3.1:6969
