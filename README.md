@@ -1,17 +1,6 @@
 # Mesh-V1
 802.11s/BATMAN-adv  Wi-Fi Mesh and Rnode/Reticulum with CoT Tx Script
 
-## Network Connectivity Options
-
-### Reticulum TCP Interface
-For connecting phones or other devices to the mesh network:
-- Enable the TCP Server Interface in the Reticulum config
-- Default settings: listen_ip = 0.0.0.0, listen_port = 4242
-- All gateway nodes should use consistent port settings
-- Only needed on nodes that will serve as gateways for external devices
-
-## Software Requirements
-
 ### System Requirements
 - Pi-OS Bookworm with MACsec enabled kernel
 - NetworkManager
