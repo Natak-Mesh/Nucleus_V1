@@ -3,6 +3,16 @@
 ## Overview
 ATAK Handler is a specialized component that manages the transmission of TAK Protocol packets between ATAK instances and the mesh network. It handles packet compression, deduplication, and routing to ensure efficient and reliable communication across different network conditions. The handler dynamically adapts its behavior based on network environment, optimizing packet transmission according to whether nodes are operating in LORA or WiFi mode.
 
+## File Structure
+The ATAK Handler module consists of the following files:
+
+- **atak_handler.py**: Main implementation file that handles packet processing, compression, and transmission
+- **utils/__init__.py**: Package initialization file for the utils module
+- **utils/compression.py**: Wrapper for compression and decompression functions
+- **utils/cot_zstd_compressor.py**: Implementation of Zstandard compression for CoT packets
+- **utils/cot_zstd_decompressor.py**: Implementation of Zstandard decompression for CoT packets
+- **utils/cot_dict_131072.zstd**: Pre-trained dictionary file for optimized compression of CoT packets
+
 ## Packet Flow Architecture
 
 ### Shared Directory Structure
@@ -107,6 +117,12 @@ The system implements multiple strategies to prevent packet loops:
 - Prevents accumulation of unprocessed packets when not needed
 - Optimizes system resources based on current network topology
 
+### Position Update Rate Limiting
+- Implements rate limiting for position update packets (type 'a-f-G-U-C')
+- Limits position updates to once per 60 seconds by default
+- Reduces network congestion from frequent position updates
+- Non-position packets bypass this rate limiting
+
 ## Socket Management
 
 ### Persistent Socket Architecture
@@ -120,12 +136,25 @@ The system implements multiple strategies to prevent packet loops:
 - Handles multicast group membership properly across interface changes
 - Provides graceful fallback when interface is unavailable
 
+## Logging
+- Implements comprehensive logging for packet processing activities
+- Logs packet reception, compression/decompression, and transmission events
+- Provides detailed debug information for troubleshooting
+- Writes logs to packet_logs.log for persistent record keeping
+
+## External Dependencies
+- Requires `takproto` module for parsing and identifying TAK packet types
+- Uses standard Python libraries for networking, threading, and file operations
+- Integrates with external logging module for consistent log formatting
+
 ## Configurable Variables
 
 ### Packet Processing
 - `MAX_RECENT_PACKETS`: Size of the deduplication queue (default: 1000)
   - Increasing this value improves deduplication at the cost of memory usage
   - Decreasing reduces memory usage but may allow duplicate packets
+- `POSITION_UPDATE_RATE_LIMIT`: Time in seconds between position updates (default: 60)
+  - Adjusting this value balances position accuracy against network load
 
 ### Network Configuration
 - `ATAK_OUT_ADDRS`: Multicast addresses for ATAK communication
