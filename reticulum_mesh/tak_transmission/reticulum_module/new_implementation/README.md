@@ -304,3 +304,27 @@ The system provides comprehensive logging to aid in troubleshooting:
    - Monitor the log files for delivery confirmations and retry attempts
    - Check the contents of the pending, sent_buffer, and incoming directories
    - Verify that node_status.json is being updated correctly by the OGM monitor
+
+4. **Real-time Log Monitoring**
+   
+   Use the following tail commands to watch the logs in real-time:
+   
+   ```bash
+   # Monitor PacketManager logs
+   tail -f /var/log/reticulum/packet_logs.log
+   
+   # Monitor PeerDiscovery logs
+   tail -f /var/log/reticulum/peer_discovery.log
+   
+   # Monitor all Reticulum logs simultaneously
+   tail -f /var/log/reticulum/*.log
+   
+   # Monitor with highlighted errors (requires ccze)
+   tail -f /var/log/reticulum/packet_logs.log | ccze -A
+   
+   # Monitor with grep for specific events
+   tail -f /var/log/reticulum/packet_logs.log | grep "delivered"
+   tail -f /var/log/reticulum/packet_logs.log | grep "retry"
+   ```
+   
+   These commands provide real-time visibility into the system's operation, which is particularly useful for debugging transmission issues or monitoring packet delivery.
