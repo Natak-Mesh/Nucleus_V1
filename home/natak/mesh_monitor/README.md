@@ -1,168 +1,104 @@
-# Mesh Monitor
+# Mesh Monitor Directory
 
-A Flask web application that provides real-time monitoring of mesh network status, including both batman-adv mesh connections and Reticulum peers.
+This directory contains a Flask-based web application that provides real-time monitoring of the mesh network status. It visualizes both BATMAN-adv mesh connections and Reticulum peer information through an interactive web interface.
 
-## Overview
+## File Overview
 
-The mesh monitor consists of a Flask backend (`app.py`) that collects data from multiple sources and serves it through a web interface. It provides:
+### app.py
+A Python Flask application that serves as the backend for the mesh monitoring system. This script:
+- Creates a web server that hosts the monitoring interface
+- Reads data from multiple sources:
+  - Node status information from `/home/natak/reticulum_mesh/ogm_monitor/node_status.json`
+  - Peer discovery data from `/home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.json`
+  - Packet logs from `/var/log/reticulum/packet_logs.log`
+- Provides several routes:
+  - `/`: The main monitoring dashboard
+  - `/packet-logs`: A dedicated view for packet transmission logs
+  - `/api/node-status`: JSON API endpoint for node and peer data
+  - `/api/packet-logs`: JSON API endpoint for packet log data
+- Parses and processes log entries to extract meaningful information
+- Serves the web interface templates with real-time data
 
-- Real-time monitoring of mesh network nodes with hostname resolution
-- Local node information (MAC addresses and IP)
-- Hostname and IP mapping for mesh nodes
-- Throughput metrics from BATMAN_V routing algorithm
-- Reticulum peer status
-- Auto-refresh and pull-to-refresh capabilities
-- Mobile-friendly responsive design
+### templates/index.html
+The main web interface template that displays the mesh network status. This file:
+- Provides a responsive layout that works on both desktop and mobile devices
+- Displays BATMAN mesh nodes in a grid layout with detailed status information:
+  - Hostname and IP address
+  - MAC address
+  - Current mode (WIFI or LORA)
+  - Last seen time
+  - Throughput metrics
+  - Next hop information
+  - Failure and success counts
+- Shows Reticulum peers with their connection details:
+  - Peer hostname
+  - Destination hash
+  - Last seen time
+- Implements automatic refresh using JavaScript fetch API
+- Uses a dark-themed interface for better visibility in field conditions
 
-## How app.py Works
+### templates/packet_logs.html
+A template for displaying packet transmission logs. This file:
+- Shows a chronological list of packet-related events
+- Filters out non-essential log entries to focus on important events
+- Color-codes different types of log entries:
+  - UDP packets
+  - ATAK to LoRa transmissions
+  - LoRa to ATAK transmissions
+  - Received packets
+  - Delivered packets
+  - Completed transmissions
+  - Retry attempts
+- Provides a connection status indicator
+- Includes timestamp information for each log entry
+- Automatically scrolls to show the most recent logs
 
-### Main Components
-
-1. **Flask Application Setup**
-   - Creates a Flask web server
-   - Serves a dynamic web interface using the `templates/index.html` template
-   - Provides API endpoints for data retrieval
-
-2. **Data Collection Functions**
-
-   a. `load_hostname_mapping()`
-   - Loads the hostname mapping file from `/home/natak/mesh/hostname_mapping.json`
-   - Maps MAC addresses to hostnames and IP addresses
-   - Used to provide human-readable node identification
-   - Returns a dictionary of MAC address mappings
-
-   b. `get_local_info()`
-   - Retrieves information about the local node
-   - Uses `batctl o` to get batman-adv interface information
-   - Uses `ip addr show br0` to get IP address information
-   - Returns MAC addresses (WLAN and batman-adv) and IP address
-
-   b. `get_reticulum_peers()`
-   - Connects to ATAK relay Unix domain socket
-   - Tries two possible socket paths:
-     1. `/var/run/atak_relay.sock`
-     2. `/tmp/atak_relay.sock`
-   - Retrieves peer information from the ATAK relay service
-   - Returns a dictionary of connected Reticulum peers
-
-   c. `parse_batman_originators()`
-   - Parses the output of `batctl o` command
-   - Processes batman-adv mesh node information
-   - Extracts details like:
-     - MAC addresses
-     - Last seen times
-     - Route metrics
-     - Next hop information
-     - Interface details
-
-### Routes
-
-1. **Main Route (`/`)**
-   ```python
-   @app.route('/')
-   def home():
-      return render_template('index.html', hostname=socket.gethostname())
-   ```
-   - Serves the main web interface
-   - Passes local hostname to the template
-
-2. **API Endpoints**
-
-   a. `/get_mesh_data`
-   ```python
-   @app.route('/get_mesh_data')
-   def get_mesh_data():
-       # Collects and returns mesh network data
-   ```
-   - Returns JSON containing:
-     - Local node information
-     - Connected mesh nodes
-     - Reticulum peers
-     - Success/error status
-
-   b. `/force_announce` (POST)
-   ```python
-   @app.route('/force_announce', methods=['POST'])
-   def handle_force_announce():
-       # Triggers announce to update peer timestamps
-   ```
-   - Sends force announce command to ATAK relay
-   - Triggers peer responses to update "last seen" times
-   - Returns success/error status
-
-### Data Sources
-
-1. **batman-adv**
-   - Uses `batctl o` command to get mesh originator information
-   - Provides details about connected mesh nodes
-   - Shows throughput metrics from BATMAN_V routing algorithm
-   - Displays link quality through Mbps measurements
-
-2. **Hostname Mapping**
-   - JSON file located at `/home/natak/mesh/hostname_mapping.json`
-   - Maps MAC addresses to hostnames and IP addresses
-   - Format:
-     ```json
-     {
-       "00:11:22:33:44:55": {
-         "hostname": "nodeName",
-         "ip": "192.168.x.x"
-       }
-     }
-     ```
-   - Enables human-readable node identification
-
-3. **Local Network**
-   - Uses `ip addr show br0` to get bridge interface information
-   - Provides local IP address information
-
-4. **Reticulum Network**
-   - Connects to ATAK relay socket
-   - Gets information about connected Reticulum peers
-   - Provides peer hostnames and hashes
-
-### Data Flow
-
-1. Frontend makes periodic requests to `/get_mesh_data`
-2. Backend collects data from multiple sources:
-   - Loads hostname mapping from JSON file
-   - Executes system commands for batman-adv info
-   - Reads network interface details
-   - Connects to ATAK relay socket
-3. Data is processed and enriched:
-   - MAC addresses are mapped to hostnames and IPs
-   - Throughput metrics are extracted from batman-adv output
-   - Node information is consolidated
-4. JSON response is sent back to frontend
-5. Frontend updates the UI with new information:
-   - Displays hostnames and IPs for each node
-   - Shows throughput in Mbps
-   - Updates connection status
-
-## Integration Points
-
-### batman-adv Integration
-- Directly interfaces with batman-adv through the `batctl` command
-- Parses command output to extract node and routing information
-- Filters and processes data to show relevant mesh network status
-
-### ATAK Relay Integration
-- Connects to Unix domain socket created by ATAK relay service
-- Receives peer information from the Reticulum network
-- Integrates Reticulum peer data with mesh network information
-- Provides force announce mechanism to:
-  - Trigger peer announces on demand
-  - Update "last seen" timestamps
-  - Verify peer connectivity
-
-### Frontend Integration
-- Serves a responsive web interface
-- Updates data in real-time
-- Provides interactive features like:
-  - Expandable node details
-  - Click-to-copy MAC and IP addresses
-  - Pull-to-refresh functionality
+### packet_logs.html
+A standalone HTML file that provides an enhanced view of packet delivery logs. This file:
+- Offers a more sophisticated interface for monitoring packet transmissions
+- Includes features not present in the template version:
+  - Pause/resume functionality for log updates
+  - Manual scroll controls
+  - More detailed packet status visualization
+  - Enhanced filtering of log entries
+  - Improved formatting of packet information
   - Connection status indicator
-  - Force announce to update peer status
+- Uses EventSource for real-time updates
+- Implements advanced log parsing to extract packet IDs, destinations, and timing information
+- Provides visual differentiation between various packet states (sent, confirmed, failed, retry)
+- Includes link establishment and data transmission monitoring
 
-For more details about the force announce mechanism and recent updates, see [force_announce_update.md](force_announce_update.md).
+## Data Sources
+
+The mesh monitor integrates with several data sources:
+
+1. **Node Status JSON**
+   - Path: `/home/natak/reticulum_mesh/ogm_monitor/node_status.json`
+   - Contains information about mesh nodes collected by the OGM monitor
+   - Includes node hostnames, IP addresses, MAC addresses, and connection metrics
+
+2. **Peer Discovery JSON**
+   - Path: `/home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.json`
+   - Stores information about Reticulum peers
+   - Includes peer hostnames, destination hashes, and last seen timestamps
+
+3. **Packet Logs**
+   - Path: `/var/log/reticulum/packet_logs.log`
+   - Contains detailed logs of packet transmissions
+   - Records events such as packet sending, delivery confirmations, and retries
+
+## Usage
+
+The mesh monitor is typically accessed through a web browser by navigating to the IP address of the mesh node running the application, on port 5000:
+
+```
+http://<node-ip>:5000/
+```
+
+Note: The node IP address is set by the `/etc/systemd/network/br0.network` configuration file.
+
+The application provides two main views:
+- The main dashboard showing node and peer status
+- The packet logs view for monitoring message transmissions
+
+The web interface automatically refreshes to show the current state of the mesh network, making it valuable for both setup/configuration and ongoing monitoring of network health.
