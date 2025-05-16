@@ -21,13 +21,15 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 - Creates a fresh peer_discovery.json file with empty peers
 - Ensures no stale peer information persists between restarts
 - Resets all internal tracking variables
+- Implements a STARTUP_DELAY (default: 10 seconds) to allow LoRa radio initialization
 
 ### 3. Configuration and Filtering
-- Uses config.py for key settings:
+- Uses config.py (located at `{BASE_DIR}/tak_transmission/reticulum_module/new_implementation/config.py`) for key settings:
   - APP_NAME and ASPECT for filtering announces (e.g., "atak.cot")
   - ANNOUNCE_INTERVAL for periodic announces (60 seconds)
   - PEER_TIMEOUT for stale peer removal (300 seconds)
   - BASE_DIR for file paths
+  - STARTUP_DELAY for LoRa radio initialization (10 seconds)
 - Aspect filtering ensures only relevant peers are discovered
 - Only processes announces matching "{APP_NAME}.{ASPECT}"
 - Nodes must share the same APP_NAME and ASPECT to be discovered as peers
@@ -36,7 +38,7 @@ The PeerDiscovery module is responsible for announcing our presence on the Retic
 - Broadcasts our presence on the network
 - Processes announces from other peers
 - Uses responsive announces to quickly form mesh connections
-- A thread runs in the background to periodically send announces every ANNOUNCE_INTERVAL seconds
+- A daemon thread runs in the background to periodically send announces every ANNOUNCE_INTERVAL seconds
 - Skips processing of our own announces to prevent loops
 
 ### Critical Implementation Detail: Destination Hashes
@@ -68,6 +70,7 @@ This was a critical bug discovered in earlier versions where deriving the hash f
     }
     ```
 - File is stored at `{config.BASE_DIR}/tak_transmission/reticulum_module/new_implementation/peer_discovery.json`
+  - Note: While config.py defines PEER_STATUS_PATH, the actual implementation uses the path constructed as shown above
 
 ### 6. Peer Maintenance
 - Tracks the "last seen" timestamp for each peer
@@ -134,6 +137,18 @@ To enable quick mesh formation, the module implements a responsive announce syst
 - `__init__(aspect_filter, parent)`: Initialize announce handler
 - `received_announce(destination_hash, announced_identity, app_data)`: Process incoming announces
 
+## Logging Implementation
+
+- Uses the dedicated logger module for consistent log formatting
+- Creates a logger instance with name "PeerDiscovery" for the main module
+- Creates a logger instance with name "AnnounceHandler" for the announce handler
+- Logs are written to "peer_discovery.log"
+- Provides comprehensive logging at various levels:
+  - INFO: Peer additions, updates, and removals
+  - DEBUG: Announce sending and receiving
+  - ERROR: Error conditions during announce processing or file operations
+- Log format follows the standard defined in config.py
+
 ## Safety Features
 
 - Nodes don't add themselves to their peer maps or JSON
@@ -145,3 +160,4 @@ To enable quick mesh formation, the module implements a responsive announce syst
 - No state persistence between restarts
 - Comprehensive logging via dedicated logger module
 - Hostname validation before processing
+- Announce thread runs as daemon to ensure clean program exit
