@@ -31,7 +31,7 @@ For connecting phones or other devices to the mesh network:
 
 ## Hardware Requirements
 - Pi 4 w/ 4 GB ram
-- Alfa AWUS036ACHM wifi card
-- RAK19007 kit
+- 802.11s Compatible wifi card
+- Rnode compatible LoRa Radio
 - 32 GB microSD
 - assorted cables/bulkead fittings/connectors
