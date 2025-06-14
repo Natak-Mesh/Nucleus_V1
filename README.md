@@ -1,3 +1,6 @@
+This version uses reticulum/rnode as the lora connection. uses zstd to just directly compress packets as i had a very hard time parsing out required info in takproto and making a new packet. the meshtastic branch probably solved that problem, but with reticulum, message retries, ack's etc all have to be done manually and it got very complex. plus this does not ahve a good multicast option, so reticulum had to send to each node sequentially and packet sizes were still large due to compressing the entire CoT packet. mesh flooded very quickly. works ok on bench but field tests were poor when on lora
+
+
 # Mesh-V1
 802.11s/BATMAN-adv  Wi-Fi Mesh and Rnode/Reticulum with CoT Tx Script
 
