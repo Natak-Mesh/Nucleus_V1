@@ -3,40 +3,43 @@ import socket
 import subprocess
 import json
 import time
+import os
 
 app = Flask(__name__)
 
+# Configuration
+NODE_TIMEOUT = 30  # Seconds - nodes not seen within this time will be greyed out
+
+def get_local_mac():
+    """Get local MAC from wlan1 interface"""
+    try:
+        result = subprocess.run(['cat', '/sys/class/net/wlan1/address'], 
+                              capture_output=True, text=True)
+        return result.stdout.strip() if result.returncode == 0 else "unknown"
+    except:
+        return "unknown"
+
 def read_node_status():
     try:
-        with open('/home/natak/reticulum_mesh/ogm_monitor/node_status.json', 'r') as f:
+        with open('/home/natak/mesh/ogm_monitor/node_status.json', 'r') as f:
             data = json.load(f)
             return data.get('nodes', {})
     except Exception as e:
         print(f"Error reading node_status.json: {e}")
         return {}
 
-def read_peer_discovery():
-    try:
-        with open('/home/natak/reticulum_mesh/tak_transmission/reticulum_module/new_implementation/peer_discovery.json', 'r') as f:
-            data = json.load(f)
-            current_time = int(time.time())
-            peers = data.get('peers', {})
-            # Add current_time to each peer for calculating "seconds ago"
-            for peer in peers.values():
-                peer['current_time'] = current_time
-            return peers
-    except Exception as e:
-        print(f"Error reading peer_discovery.json: {e}")
-        return {}
+
 
 @app.route('/')
-def home():
+def wifi_page():
+    """Default WiFi page showing node status"""
     node_status = read_node_status()
-    peer_discovery = read_peer_discovery()
-    return render_template('index.html', 
+    return render_template('wifi.html', 
                          hostname=socket.gethostname(),
+                         local_mac=get_local_mac(),
                          node_status=node_status,
-                         peer_discovery=peer_discovery)
+                         node_timeout=NODE_TIMEOUT)
+
 
 def parse_log_line(line):
     try:
@@ -95,13 +98,16 @@ def packet_logs():
                          hostname=socket.gethostname(),
                          logs=logs)
 
-@app.route('/api/node-status')
-def api_node_status():
+@app.route('/api/wifi')
+def api_wifi():
+    """API endpoint for WiFi page data"""
     return jsonify({
         'hostname': socket.gethostname(),
+        'local_mac': get_local_mac(),
         'node_status': read_node_status(),
-        'peer_discovery': read_peer_discovery()
+        'node_timeout': NODE_TIMEOUT
     })
+
 
 @app.route('/api/packet-logs')
 def api_packet_logs():
@@ -110,5 +116,6 @@ def api_packet_logs():
         'logs': read_packet_logs()
     })
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

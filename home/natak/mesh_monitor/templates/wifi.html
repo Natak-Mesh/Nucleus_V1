@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mesh Monitor - WiFi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --background-color: #1a1a1a;
+            --text-color: #ffffff;
+            --card-background: #2d2d2d;
+            --card-inactive: #1a1a1a;
+            --text-inactive: #666666;
+        }
+
+        body {
+            font-family: monospace;
+            margin: 0;
+            padding: 16px;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 16px;
+        }
+
+        .nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav a:hover {
+            background-color: #444;
+        }
+
+        .nav a.active {
+            background-color: #4caf50;
+            border-color: #4caf50;
+        }
+
+        .section {
+            background-color: var(--card-background);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .node-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .node-card {
+            background-color: var(--background-color);
+            padding: 16px;
+            border-radius: 4px;
+            transition: opacity 0.3s, background-color 0.3s;
+        }
+
+        .node-card.inactive {
+            background-color: var(--card-inactive);
+            opacity: 0.5;
+            color: var(--text-inactive);
+        }
+
+        h1, h2 {
+            margin-top: 0;
+        }
+
+        .stats {
+            font-size: 14px;
+            margin: 8px 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background-color: #4caf50;
+        }
+
+        .status-inactive {
+            background-color: #f44336;
+        }
+
+        .local-mac {
+            font-size: 14px;
+            color: #999;
+        }
+    </style>
+    <script>
+        function updateData() {
+            fetch('/api/wifi')
+                .then(response => response.json())
+                .then(data => {
+                    // Update the hostname and local MAC
+                    document.querySelector('h1').textContent = data.hostname;
+                    document.querySelector('.local-mac').textContent = 'Local MAC: ' + data.local_mac;
+                    
+                    // Update node status
+                    const nodeGrid = document.querySelector('.node-grid');
+                    nodeGrid.innerHTML = '';  // Clear current nodes
+                    
+                    Object.entries(data.node_status).forEach(([mac, node]) => {
+                        // Check if node should be greyed out
+                        const isInactive = node.last_seen > data.node_timeout;
+                        const cardClass = isInactive ? 'node-card inactive' : 'node-card';
+                        const statusClass = isInactive ? 'status-inactive' : 'status-active';
+                        
+                        nodeGrid.innerHTML += `
+                            <div class="${cardClass}">
+                                <h3><span class="status-indicator ${statusClass}"></span>${mac}</h3>
+                                <div class="stats">Last Seen: ${node.last_seen.toFixed(2)}s ago</div>
+                                <div class="stats">Throughput: ${node.throughput.toFixed(1)} Mbps</div>
+                                <div class="stats">Next Hop: ${node.nexthop}</div>
+                            </div>
+                        `;
+                    });
+                    
+                    // Schedule next update
+                    setTimeout(updateData, 1000); // Refresh every 1 second
+                })
+                .catch(error => {
+                    console.error('Update failed:', error);
+                    setTimeout(updateData, 1000); // Try again
+                });
+        }
+        
+        // Start the update cycle when page loads
+        document.addEventListener('DOMContentLoaded', updateData);
+    </script>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>{{ hostname }}</h1>
+            <div class="local-mac">Local MAC: {{ local_mac }}</div>
+        </div>
+        <div class="nav">
+            <a href="/" class="active">WiFi</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>BATMAN Mesh Status</h2>
+        <div class="node-grid">
+            {% for mac, node in node_status.items() %}
+            {% set is_inactive = node.last_seen > node_timeout %}
+            <div class="node-card{% if is_inactive %} inactive{% endif %}">
+                <h3><span class="status-indicator {% if is_inactive %}status-inactive{% else %}status-active{% endif %}"></span>{{ mac }}</h3>
+                <div class="stats">Last Seen: {{ "%.2f"|format(node.last_seen) }}s ago</div>
+                <div class="stats">Throughput: {{ "%.1f"|format(node.throughput) }} Mbps</div>
+                <div class="stats">Next Hop: {{ node.nexthop }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
