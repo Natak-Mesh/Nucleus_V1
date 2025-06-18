@@ -1,19 +1,21 @@
 [Unit]
-Description=Mesh Network and Monitor
-After=network.target
+Description=Mesh Monitor Web Interface
+After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
+#User=natak
+#Group=natak
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/natak
 Environment=USER=natak
 Environment=PYTHONPATH=/home/natak/meshtastic
-WorkingDirectory=/home/natak
-ExecStartPre=sleep 5
-ExecStart=/home/natak/mesh/startup_sequence.sh
-
+WorkingDirectory=/home/natak/mesh_monitor
+ExecStartPre=sleep 15
+ExecStart=/home/natak/mesh_monitor/start_monitor.sh
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
