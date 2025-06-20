@@ -34,7 +34,7 @@ sleep 2
 
 # Start rnsd (Reticulum Network Stack Daemon) in background
 echo "Starting rnsd (Reticulum Network Stack Daemon)..."
-nohup rnsd > /var/log/rnsd.log 2>&1 &
+nohup runuser -l natak -c 'rnsd' > /var/log/rnsd.log 2>&1 &
 RNSD_PID=$!
 
 # Give rnsd time to initialize
