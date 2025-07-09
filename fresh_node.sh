@@ -6,14 +6,11 @@
 # 
 # 1. Configure /etc/hostapd/hostapd.conf , dont forget you have to unmask and enable
 # 2. Configure NetworkManager unmanaged.conf ***added to script****
-# 3. Edit /etc/systemd/network/br0.network with correct IP addres and DHCP lease range
-# 4. Move over MACsec config tool files ***added to script****
-# 5. Move over mesh contents, including ogm_monitor subdirectory
-# 6. Move over Mesh_monitor contents, including templates subdirectory
-# 7. Move over meshtastic directory contents, including test programs and doc sub directories
-# 8. Set mesh variables in ~/mesh/mesh_config.env
-# 9. move hostname mapping.json and macsec.sh from the macsec config tool folder into ~/mesh
-# 10. still need to sort out web page startup, had to comment that out of mesh-startup.system
+# 3. Enable systemd-networkd
+# 4. Edit /etc/systemd/network/br0.network with correct IP addres and DHCP lease range
+# 5. 
+# 6. 
+# 7.
 # ==============================================================================
 
 # Remove leftover kernel build artifacts from image
@@ -31,7 +28,7 @@ sudo systemctl restart systemd-networkd
 sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip
 
 # Install Python packages
-pip3 install --break-system-packages meshtastic takproto PyQRCode pyserial PyYAML pypng Pypubsub protobuf rns
+pip3 install --break-system-packages rns
 
 # Install Flask system-wide for systemd services
 sudo pip3 install --break-system-packages Flask
@@ -44,3 +41,6 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 # Enable NetworkManager
 sudo systemctl enable NetworkManager
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd
+sudo systemctl enable systemd-networkd
