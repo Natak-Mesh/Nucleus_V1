@@ -27,6 +27,14 @@ sudo systemctl restart systemd-networkd
 # Install required packages
 sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip
 
+#install docker
+curl -fsSL https://get.docker.com | sudo sh
+#add your user to docker group
+sudo usermod -aG docker $USER
+#compose, not sure if we need this but do it anyways for now
+sudo apt install docker-compose -y
+
+
 # Install Python packages
 pip3 install --break-system-packages rns
 
