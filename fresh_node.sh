@@ -8,7 +8,7 @@
 # 2. Configure NetworkManager unmanaged.conf ***added to script****
 # 3. Enable systemd-networkd
 # 4. Edit /etc/systemd/network/br0.network with correct IP addres and DHCP lease range
-# 5. 
+# 5. dont forget to stop and disable the default system wpa_supplicant service
 # 6. 
 # 7.
 # ==============================================================================
