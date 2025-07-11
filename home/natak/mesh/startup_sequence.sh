@@ -17,7 +17,7 @@ echo "Running Batman mesh setup..."
 sudo /home/natak/mesh/batmesh.sh
 
 # Brief pause after network setup
-sleep 2
+sleep 19
 
 # Start rnsd (Reticulum Network Stack Daemon) in background
 echo "Starting rnsd (Reticulum Network Stack Daemon)..."
@@ -25,7 +25,7 @@ nohup runuser -l natak -c 'rnsd' > /var/log/rnsd.log 2>&1 &
 RNSD_PID=$!
 
 # Give rnsd time to initialize
-sleep 2
+sleep 10
 
 # Start enhanced OGM monitor in background
 echo "Starting enhanced OGM monitor..."
