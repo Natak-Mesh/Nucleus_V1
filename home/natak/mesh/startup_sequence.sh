@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # Mesh Startup Sequence Script
+
 # Enable error reporting
 set -e
 
 echo "Starting mesh startup sequence..."
 
-#wpa_supplicant runs in batmesh.sh
+
+# wpa_supplicant is run in batmesh.sh
 #wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
 
 # Brief pause between network setup steps
@@ -17,7 +19,7 @@ echo "Running Batman mesh setup..."
 sudo /home/natak/mesh/batmesh.sh
 
 # Brief pause after network setup
-sleep 19
+sleep 10
 
 # Start rnsd (Reticulum Network Stack Daemon) in background
 echo "Starting rnsd (Reticulum Network Stack Daemon)..."
@@ -36,3 +38,4 @@ echo "Mesh startup sequence completed successfully"
 echo "ATAK module running with PID: $ATAK_PID"
 echo "rnsd running with PID: $RNSD_PID"
 echo "Enhanced OGM monitor running with PID: $OGM_PID"
+
