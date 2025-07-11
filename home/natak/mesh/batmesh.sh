@@ -1,16 +1,29 @@
 #!/bin/bash
 
+# Add debug output
+#set -x
+
+# Clean up any existing batman interface
+sudo ip link del bat0 2>/dev/null || true
+
+
 # Set interfaces to not be managed by NetworkManager
 nmcli device set eth0 managed no
 nmcli device set wlan1 managed no
 nmcli device set br0 managed no
 
+#sudo ip link set dev wlan1 mtu 1532
+
 #wpa_supplicant sets up mesh and disables HWMP routing
-wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
+sudo wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
+
+sleep 5
+#iw wlan1 mesh_param mesh_auto_open_plinks 1
+
 
 # Load batman-adv and set routing algorithm
-modprobe batman-adv
-batctl ra BATMAN_V
+sudo modprobe batman-adv
+sudo batctl ra BATMAN_V
 sudo ip link add bat0 type batadv
 sudo ip link set dev wlan1 master bat0
 sudo ip link set dev bat0 up
