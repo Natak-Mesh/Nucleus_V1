@@ -6,6 +6,8 @@
 # Clean up any existing batman interface
 sudo ip link del bat0 2>/dev/null || true
 
+# Enable IP forwarding for routing between interfaces
+sudo sysctl -w net.ipv4.ip_forward=1
 
 # Set interfaces to not be managed by NetworkManager
 nmcli device set eth0 managed no
