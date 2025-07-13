@@ -1,6 +1,7 @@
 # Assuming use of takserver-docker-5.3-RELEASE-30
 # based on https://www.youtube.com/watch?v=7IiB54cO6RA&t=1372s
 # mytecknet "docker:installing takserver 5.x"
+# THIS DOES NOT WORK ON A PI, ONLY GOOD FOR PC BUILDS
 
 # Command Snippets
 unzip takserver-docker-5.3-RELEASE-30/
