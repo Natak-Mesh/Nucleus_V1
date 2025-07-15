@@ -45,6 +45,12 @@ echo "Starting enhanced OGM monitor..."
 cd /home/natak/mesh/ogm_monitor && python3 enhanced_ogm_monitor.py &
 OGM_PID=$!
 
+sleep 5
+
+#start media mtx
+nohup /home/natak/mediamtx/mediamtx > /dev/null 2>&1 &
+
+
 echo "Mesh startup sequence completed successfully"
 echo "ATAK module running with PID: $ATAK_PID"
 echo "rnsd running with PID: $RNSD_PID"
