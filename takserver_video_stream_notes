@@ -5,6 +5,10 @@ This guide explains how to stream video from OpenTAK ICU to ATAK via MediaMTX an
 ## System Overview
 OpenTAK ICU pushes RTSP (H.264 + AAC) to MediaMTX. TAKServer registers the stream, and ATAK EUDs pull the stream from TAKServer.
 
+tar -xvzf mediamtx_linux_arm64.tar.gz
+sudo mv mediamtx /usr/local/bin/
+
+
 ## MediaMTX Configuration
 Edit mediamtx.yml:
 
