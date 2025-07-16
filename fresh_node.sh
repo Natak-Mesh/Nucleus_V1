@@ -30,6 +30,25 @@ sudo systemctl restart systemd-networkd
 # Install required packages
 sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip
 
+# media mtx install
+# 1. Download latest MediaMTX release for ARM64
+wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64.tar.gz
+
+# 2. Extract it
+tar -xvzf mediamtx_linux_arm64.tar.gz
+
+# 3. Move binary to /usr/local/bin
+sudo mv mediamtx /usr/local/bin/
+
+# 4. Make it executable
+sudo chmod +x /usr/local/bin/mediamtx
+
+# 5. (Optional) Test run
+mediamtx
+
+
+
+
 # Install Python packages
 pip3 install --break-system-packages meshtastic takproto PyQRCode pyserial PyYAML pypng Pypubsub protobuf rns
 
