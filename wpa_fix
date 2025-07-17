@@ -33,6 +33,7 @@ chronyc -a makestep
 #start wpa_supplicant prior to any bat commands'
 wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant.conf
 
+###############pay attention here, want to switch to RA BATMAN_V need to pull from batmesh.sh
 # Bridge setup
 ip link set dev br0 up
 ip link add bat0 type batadv
