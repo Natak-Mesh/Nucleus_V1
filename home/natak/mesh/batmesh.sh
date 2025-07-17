@@ -11,6 +11,14 @@ nmcli device set eth0 managed no
 nmcli device set wlan1 managed no
 nmcli device set br0 managed no
 
+# Stop systemd-timesyncd to prevent network interference during SAE
+echo "batmesh: Stopping systemd-timesyncd" >> /var/log/batmesh.log
+systemctl stop systemd-timesyncd
+
+# Set consistent time for SAE authentication
+echo "batmesh: Setting consistent time" >> /var/log/batmesh.log
+date -s "2025-07-16 12:00:00"
+
 wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
 
 # Load batman-adv and set routing algorithm
