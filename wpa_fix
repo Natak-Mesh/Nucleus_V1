@@ -23,6 +23,10 @@ iw dev wlan1 set meshid $MESH_NAME
 iw dev wlan1 set channel $CHANNEL
 ifconfig wlan1 up
 
+# increase wlan1 MTU, allegedly fragmentation could cause wpa to fail
+# bring to 1532 to account for batman overhead of 32 bytes
+sudo ip link set dev wlan1 mtu 1532
+
 #sync mesh clock, will ned to have chrony configured and running first
 chronyc -a makestep
 
