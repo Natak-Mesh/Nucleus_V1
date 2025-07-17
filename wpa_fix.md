@@ -1,0 +1,63 @@
+#base script to establish mesh w/out wpa supplicant
+
+#!/bin/bash
+
+# Load configuration
+set -a; source /home/natak/mesh/mesh_config.env; set +a
+
+# Set interfaces to not be managed by NetworkManager
+nmcli device set eth0 managed no
+nmcli device set wlan1 managed no
+nmcli device set br0 managed no
+
+#load batman-adv
+modprobe batman-adv
+
+# Configure mesh interface
+ifconfig wlan1 down
+iw reg set "US"
+iw dev wlan1 set type managed
+iw dev wlan1 set 4addr on
+iw dev wlan1 set type mesh
+iw dev wlan1 set meshid $MESH_NAME
+iw dev wlan1 set channel $CHANNEL
+ifconfig wlan1 up
+
+#sync mesh clock, will ned to have chrony configured and running first
+chronyc -a makestep
+
+#start wpa_supplicant prior to any bat commands'
+wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant.conf
+
+# Bridge setup
+ip link set dev br0 up
+ip link add bat0 type batadv
+#ip link set dev macsec0 master bat0  
+ip link set dev wlan1 master bat0
+#ip link set dev bat0 mtu 1468
+#ip link set dev eth0 mtu 1468
+ip link set dev bat0 mtu 1500
+ip link set dev eth0 mtu 1500
+
+
+
+nmcli device set bat0 managed no
+ip link set dev bat0 up
+ip link set dev bat0 master br0
+#this sets the OGM interval in ms. default 1000 flooded network badly
+batctl it 3000
+
+# Restart networking
+systemctl restart systemd-networkd
+
+###########################################
+
+## new wpa_supplicant for encryption only
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+country=US
+
+network={
+    key_mgmt=SAE
+    psk="52235223"
+}
