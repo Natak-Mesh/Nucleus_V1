@@ -81,4 +81,6 @@ network={
     psk="52235223"
     mesh_fwding=0
     disable_pmksa_caching=1
+    #as an option add below to continually rty to pair
+    mesh_retry_timeout=0
 }
