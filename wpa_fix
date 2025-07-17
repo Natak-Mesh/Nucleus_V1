@@ -66,3 +66,19 @@ network={
     key_mgmt=SAE
     psk="52235223"
 }
+
+######## or try this one first, disable key caching
+
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+country=US
+
+network={
+    ssid="natak_mesh"
+    mode=5
+    frequency=2462
+    key_mgmt=SAE
+    psk="52235223"
+    mesh_fwding=0
+    disable_pmksa_caching=1
+}
