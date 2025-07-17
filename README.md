@@ -1,14 +1,7 @@
-
-
-DOCKER VERSION DOES NOT WORK ON PI, THIS DOES WORK ON PC THOUGH. IN PLACE OF DOCKER USE BARE METAL INSTALL FOR PI https://mytecknet.com/lets-build-a-tak-server/
-
-
-Use takserver 5.3 docker from tak.gov
-
-Looking at bringing Takserver onto each node. Set up to federate with other nodes. Cut down on multicast traffic and get us set up for video streaming etc
-
-Install docker with<br>
-curl -fsSL https://get.docker.com | sudo sh<br>
-
-then <br>
-sudo usermod -aG docker $USER
+wpa_3 establishment is very inconcistent.
+looked at timesyncd as a potential issue, tried to fix by disabling it in batmesh and setting a default date/time. But it may be that
+wpa_supplicant needs the date/times to be very close for it to work. Seems like this may not be the case
+as I can still get ESTAB for wpa_3 occasionally, but something is definitely gotten bad.
+next 2 steps
+1. move the mesh establishment back to script, use wpa_supplicant only to handle encryption
+2. setup chrony to run after mesh establishment and before wpa_supplicant, try to get clocks synced ahead of time
