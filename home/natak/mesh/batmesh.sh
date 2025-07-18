@@ -22,13 +22,19 @@ iw dev wlan1 set meshid $MESH_NAME
 iw dev wlan1 set channel $MESH_CHANNEL
 ifconfig wlan1 up
 
+#disable stock HWMP routing to allow BATMAN-ADV to handle it
+iw dev wlan1 set mesh_param mesh_fwding 0
+
 #increase wlan1 MTU to account for BATMAN-ADV overhead 
 sudo ip link set dev wlan1 mtu 1560
+
+#start mesh
+#wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
 
 #wpa_supplicant for encryption only
 wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.conf
 
-sleep 10
+sleep 15
 
 #BATMAN-ADV setup
 sudo batctl ra BATMAN_V
