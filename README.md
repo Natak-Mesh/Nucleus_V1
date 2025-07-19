@@ -1,7 +1,37 @@
-wpa_3 establishment is very inconcistent.
-looked at timesyncd as a potential issue, tried to fix by disabling it in batmesh and setting a default date/time. But it may be that
-wpa_supplicant needs the date/times to be very close for it to work. Seems like this may not be the case
-as I can still get ESTAB for wpa_3 occasionally, but something is definitely gotten bad.
-next 2 steps
-1. move the mesh establishment back to script, use wpa_supplicant only to handle encryption (wpa_fix)
-2. setup chrony to run after mesh establishment and before wpa_supplicant, try to get clocks synced ahead of time (chrony_time_sync)
+wpa3 establishment great with the new script. now we're dealing with mt76 overcurrent bug issues.
+
+it seems there is an issue post kernel 5.15 with these mt76 cards and extended use.
+I'm seeing "overcurrent failures in the 400-600 second mark. no idea why this is coming up now 
+I thought maybe it was the 6.12 kernel, but rolling back to 6.6 didnt help
+then i looked at my Pi->card cabling thinking maybe that was the issue
+tried multiple versions, even tried the one that came with the card. No good.
+
+See below for notes
+# 📝 Summary: mt76x0u USB -71 Errors on Pi OS
+
+## 📌 Issue
+- MediaTek MT76x0U adapters (`mt76x0u` driver) failing with:
+vendor request req:07 off:XXXX failed:-71
+tx urb failed: -71
+
+- Pi4 logs also show `usb usb2-portX: over-current change #X`.
+- Started recently after years of stable use.
+
+## 🐛 Other Reports
+- Raspberry Pi Forum: “MT76 USB dongle fails with -71 after idle, only fix is replug.”  
+[forums.raspberrypi.com](https://forums.raspberrypi.com/viewtopic.php?t=385383)
+- GitHub Discussions: “Flood of vendor request failures after kernel 5.x.”  
+[github.com/morrownr/USB-WiFi/issues/213](https://github.com/morrownr/USB-WiFi/issues/213)
+- OpenWRT Patch Notes: “Fix regression with resume on mt76x0u USB devices.”
+
+
+## ✅ Possible Fix
+Disable aggressive USB control retry flood in mt76 driver.
+
+echo 'options mt76 usb_rr_retry=0' | sudo tee /etc/modprobe.d/mt76.conf
+
+sudo update-initramfs -u
+sudo reboot
+
+## If this doesnt work rollback to kernel 5.15
+## shouldnt affect anything we're doing
