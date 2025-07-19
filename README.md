@@ -35,3 +35,5 @@ sudo reboot
 
 ## If this doesnt work rollback to kernel 5.15
 ## shouldnt affect anything we're doing
+
+# the mt76 driver usb retry fix seems to have worked 7/19/25
