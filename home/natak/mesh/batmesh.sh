@@ -22,9 +22,6 @@ iw dev wlan1 set meshid $MESH_NAME
 iw dev wlan1 set channel $MESH_CHANNEL
 ifconfig wlan1 up
 
-#disable stock HWMP routing to allow BATMAN-ADV to handle it
-iw dev wlan1 set mesh_param mesh_fwding 0
-
 #increase wlan1 MTU to account for BATMAN-ADV overhead 
 sudo ip link set dev wlan1 mtu 1560
 
@@ -35,6 +32,13 @@ sudo ip link set dev wlan1 mtu 1560
 wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.conf
 
 sleep 15
+
+#disable stock HWMP routing to allow BATMAN-ADV to handle it
+iw dev wlan1 set mesh_param mesh_fwding 0
+
+# Further disable HWMP by setting PREQ interval to maximum and path timeout to minimum
+iw dev wlan1 set mesh_param mesh_hwmp_preq_min_interval 65535
+iw dev wlan1 set mesh_param mesh_hwmp_active_path_timeout 1
 
 #BATMAN-ADV setup
 sudo batctl ra BATMAN_V
