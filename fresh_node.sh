@@ -37,15 +37,7 @@ wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_li
 # 2. Extract it
 tar -xvzf mediamtx_linux_arm64.tar.gz
 
-# 3. Move binary to /usr/local/bin
-sudo mv mediamtx /usr/local/bin/
-
-# 4. Make it executable
-sudo chmod +x /usr/local/bin/mediamtx
-
-# 5. (Optional) Test run
-mediamtx
-
+TAKServer, need to get linux arm64 .deb ,docker version will not work on pi
 
 
 
