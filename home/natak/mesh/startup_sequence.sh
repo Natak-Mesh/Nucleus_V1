@@ -48,8 +48,8 @@ OGM_PID=$!
 sleep 5
 
 #start media mtx
-nohup /home/natak/mediamtx/mediamtx > /dev/null 2>&1 &
-
+#nohup /home/natak/mediamtx/mediamtx > /dev/null 2>&1 &
+/home/natak/mediamtx &
 
 echo "Mesh startup sequence completed successfully"
 echo "ATAK module running with PID: $ATAK_PID"
