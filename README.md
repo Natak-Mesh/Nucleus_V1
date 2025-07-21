@@ -29,4 +29,5 @@ Disable aggressive USB control retry flood in mt76 driver.
 `sudo reboot`<br>
 
 
-# the mt76 driver usb retry fix seems to have worked 7/19/25
+the mt76 driver usb retry fix seems to have worked 7/19/25
+ran testing all day for stability 7/20, no issues
