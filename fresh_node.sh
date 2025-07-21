@@ -35,6 +35,8 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 # Enable NetworkManager
 sudo systemctl enable NetworkManager
+# system wpa_supplicant may need to be disabled to its not running in parallel with the one you use for wlan1
+# dont forget to unmask and enable hostapd
 # -------------------------------------------------------------------------------
 
 
