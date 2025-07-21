@@ -1,1 +1,1 @@
-
+This branch moved mesh creation away from WPA_supplicant. Had issues with encryption establishing on top of the L2 link. The mesh would form quickly, but encryption would be extrememly inconsistent. Found if we moved mesh creation to a script and then used wpa_supplicant to only establish encryption it worked well.
