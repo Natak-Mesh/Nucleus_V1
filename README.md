@@ -7,10 +7,11 @@ then i looked at my Pi->card cabling thinking maybe that was the issue
 tried multiple versions, even tried the one that came with the card. No good.
 
 Error message: 
-```vendor request req:07 off:XXXX failed:-71
-tx urb failed: -71```
+`vendor request req:07 off:XXXX failed:-71
+tx urb failed: -71`
 along with overcurrent warnings on all USB ports. 
-```usb usb2-portX: over-current change #X```
+`usb usb2-portX: over-current change #X`
+
  
 
 See below for notes
