@@ -48,12 +48,14 @@ sudo ip link set dev bat0 master br0
 #Stop NetworkManager from controlling bat0 interface
 nmcli device set bat0 managed no
 
+# Set OGM interval to 1000ms for better adaptation to mobility
+batctl it 1000
+
 ## Mesh optimizations below depend on services that dont seem to start for 60+ seconds, need to watch dmesg for IGMP querier or something to that effect and adjust this timing. 
 # Set hop penalty to favor stronger direct links in poor RF conditions
 #batctl nc 1
 # Enable distributed ARP table to reduce broadcast traffic
 #batctl dat 1
-# Set OGM interval to 1000ms for better adaptation to mobility
-#batctl it 1000
+
 
 systemctl restart systemd-networkd
