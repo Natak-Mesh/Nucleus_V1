@@ -1,3 +1,6 @@
+# This file could likely use some cleanup, some of these paths refer to modules that we're not using anymore
+# but it works right now so dont want to screw with it
+
 [Unit]
 Description=Mesh Network and Monitor
 After=network.target
