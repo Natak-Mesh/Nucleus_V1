@@ -25,9 +25,6 @@ ifconfig wlan1 up
 #increase wlan1 MTU to account for BATMAN-ADV overhead 
 sudo ip link set dev wlan1 mtu 1560
 
-#start mesh
-#wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
-
 #wpa_supplicant for encryption only
 wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.conf
 
