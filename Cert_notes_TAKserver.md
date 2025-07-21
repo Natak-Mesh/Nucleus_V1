@@ -1,30 +1,5 @@
-# Assuming use of takserver-docker-5.3-RELEASE-30
-# based on https://www.youtube.com/watch?v=7IiB54cO6RA&t=1372s
-# mytecknet "docker:installing takserver 5.x"
-# THIS DOES NOT WORK ON A PI, ONLY GOOD FOR PC BUILDS
+Some notes for cert creation from the docker version of the install. not valid on Pi, but could be useful
 
-# Command Snippets
-unzip takserver-docker-5.3-RELEASE-30/
-
-#move into the directory that you just unzipped
-cd takserver-docker-5.3-RELEASE-30/
-
-docker volume create takserver-db
-docker network create takserver
-
-#generates password
-openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'
-
-#paste password from above to replace {PASSWORD} in below command
-sed -i 's/password=""/password="{PASSWORD}"/g' tak/CoreConfig.example.xml
-
-docker build -t takserver-db -f docker/Dockerfile.takserver-db .
-
-docker run --mount source=takserver-db,destination=/var/lib/postgresql -v $(pwd)/tak:/opt/tak:z -it -p 5432:5432 --network takserver --network-alias tak-database --name takserver-db -d takserver-db
-
-docker build -t takserver -f docker/Dockerfile.takserver .
-
-docker run -v $(pwd)/tak:/opt/tak:z -it -p 8089:8089 -p 8443:8443 -p 8446:8446 -p 9001:9001 --network takserver --name takserver -d takserver
 
 #for metadata script
 # note no space after =
