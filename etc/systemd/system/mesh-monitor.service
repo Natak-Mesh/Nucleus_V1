@@ -1,3 +1,5 @@
+# same as mesh-startup, could use cleanup. But don't want to mess with currently functional file
+
 [Unit]
 Description=Mesh Monitor Web Interface
 After=network-online.target
