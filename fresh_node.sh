@@ -49,3 +49,48 @@ wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_li
 
 # 2. Extract it
 tar -xvzf mediamtx_linux_arm64.tar.gz
+
+
+#################trying better formatting below, disregard for now######################
+
+# Natak Mesh Software Requirements
+
+## Core Packages (Install via apt)
+
+sudo apt update && sudo apt install -y \
+    hostapd \
+    batctl \
+    python3 \
+    python3-pip \
+    wpa_supplicant
+
+| Package | Description |
+|---------|-------------|
+| hostapd | WiFi access point daemon for creating the access point on wlan0 |
+| batctl | B.A.T.M.A.N. advanced control and management tool |
+| python3 | Python 3 runtime |
+| python3-pip | Python package installer |
+| wpa_supplicant | WPA/WPA2/WPA3 encryption for the mesh network |
+
+## Python Packages (Install via pip3)
+
+# Reticulum Network Stack
+pip3 install --break-system-packages rns
+
+# Flask web framework
+sudo pip3 install --break-system-packages flask
+
+| Package | Description |
+|---------|-------------|
+| rns | Reticulum Network Stack for mesh networking |
+| flask | Web framework for the mesh monitor web interface |
+
+## Optional Software
+
+### MediaMTX (for video streaming)
+wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64.tar.gz
+tar -xvzf mediamtx_linux_arm64.tar.gz
+
+### TAKserver (for TAKserver nodes only)
+- Download ARM64 .deb package from tak.gov
+- Install using dpkg -i command
