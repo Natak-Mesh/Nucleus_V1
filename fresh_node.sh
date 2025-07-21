@@ -7,7 +7,7 @@
 # 1. Configure /etc/hostapd/hostapd.conf , dont forget you have to unmask and enable
 # 2. Configure NetworkManager unmanaged.conf ***added to script****
 # 3. Edit /etc/systemd/network/br0.network with correct IP addres and DHCP lease range
-# 4. Move over MACsec config tool files ***added to script****
+# 4. 
 # 5. Move over mesh contents, including ogm_monitor subdirectory
 # 6. Move over Mesh_monitor contents, including templates subdirectory
 # 7. Move over meshtastic directory contents, including test programs and doc sub directories
