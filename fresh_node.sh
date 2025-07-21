@@ -2,23 +2,13 @@
 # ==============================================================================
 # FRESH NODE SETUP SCRIPT
 # ==============================================================================
-# TODO LIST - Manual Configuration Required After Running This Script:
-# 
-# 1. Configure /etc/hostapd/hostapd.conf , dont forget you have to unmask and enable
-# 2. Configure NetworkManager unmanaged.conf ***added to script****
-# 3. Edit /etc/systemd/network/br0.network with correct IP addres and DHCP lease range
-# 4. 
-# 5. Move over mesh contents, including ogm_monitor subdirectory
-# 6. Move over Mesh_monitor contents, including templates subdirectory
-# 7. Move over meshtastic directory contents, including test programs and doc sub directories
-# 8. Set mesh variables in ~/mesh/mesh_config.env
-# 9. move hostname mapping.json and macsec.sh from the macsec config tool folder into ~/mesh
-# 10. still need to sort out web page startup, had to comment that out of mesh-startup.system
-# ==============================================================================
 
+# ******************************************************************************
+# If you are flashing an existing NatakMesh image onto your harware, run the below machine ID reset commands. Otherwise ignore if this is a fresh build
 # Remove leftover kernel build artifacts from image
 rm -rf /home/natak/linux
 
+# Reset machine ID, SSH keys etc
 sudo rm /etc/machine-id
 sudo dbus-uuidgen --ensure=/etc/machine-id
 sudo rm -f /etc/machine-id
@@ -26,28 +16,18 @@ sudo systemd-machine-id-setup
 sudo rm /etc/ssh/ssh_host_*
 sudo dpkg-reconfigure openssh-server
 sudo systemctl restart systemd-networkd
+# ******************************************************************************
 
-# Install required packages
+# ------------------------------------------------------------------------------
+# For fresh build install required packages
 sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip
 
-# media mtx install
-# 1. Download latest MediaMTX release for ARM64
-wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64.tar.gz
-
-# 2. Extract it
-tar -xvzf mediamtx_linux_arm64.tar.gz
-
-TAKServer, need to get linux arm64 .deb ,docker version will not work on pi
-
-
-
-# Install Python packages
-pip3 install --break-system-packages meshtastic takproto PyQRCode pyserial PyYAML pypng Pypubsub protobuf rns
+# Install Reticulum
+pip3 install --break-system-packages rns 
+# you need to install and start rns/rnsd at least once, auto start script now will start it and the git tracked config file
 
 # Install Flask system-wide for systemd services
-sudo pip3 install --break-system-packages Flask
-# you need to install and start rns/rnsd at least once, auto start script now will start it and the git tracked config file
-#has the info for a tcp server to allow external devices to use rns over wifi
+sudo pip3 install --break-system-packages 
 
 
 # Add ~/.local/bin to PATH for pip-installed scripts
@@ -55,3 +35,15 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 # Enable NetworkManager
 sudo systemctl enable NetworkManager
+# -------------------------------------------------------------------------------
+
+
+# If this is a TAKserver node
+# *****Download and install TAKserver arm64 .deb from tak.gov******
+
+# media mtx install
+# 1. Download latest MediaMTX release for ARM64
+wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64.tar.gz
+
+# 2. Extract it
+tar -xvzf mediamtx_linux_arm64.tar.gz
