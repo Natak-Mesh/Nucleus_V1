@@ -1,3 +1,5 @@
+# Adjust IP address and pool offset/size as required to fit your network
+
 [Match]
 Name=br0
 
@@ -12,5 +14,3 @@ PoolSize=5
 EmitDNS=no
 DNS=192.168.200.1
 
-#[Link]
-#MACAddress=02:5e:82:1c:39:4f
