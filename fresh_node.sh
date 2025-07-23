@@ -27,7 +27,7 @@ pip3 install --break-system-packages rns
 # you need to install and start rns/rnsd at least once, auto start script now will start it and the git tracked config file
 
 # Install Flask system-wide for systemd services
-sudo pip3 install --break-system-packages 
+sudo pip3 install --break-system-packages flask
 
 
 # Add ~/.local/bin to PATH for pip-installed scripts
