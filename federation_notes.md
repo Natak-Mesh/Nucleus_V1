@@ -9,7 +9,38 @@ This guide provides step-by-step instructions for federating two TAK servers run
 - Intermediate certificates already installed on both Pi devices
 - All devices connected via WiFi mesh network
 
+
 ## Certificate Creation and Federation Process
+
+
+### Step 0: Create Root and Intermediate Certificates (ON DESKTOP PC)
+
+1. **ON DESKTOP PC: Generate a root private key:**
+   openssl genrsa -out root_key.pem 4096
+
+2. **ON DESKTOP PC: Create a self-signed root certificate:**
+   openssl req -x509 -new -nodes -key root_key.pem -sha256 -days 3650 -out root_cert.pem
+   (When prompted, enter details for your Certificate Authority. The Common Name should be something like "My TAK Root CA")
+
+3. **ON DESKTOP PC: Create an intermediate private key:**
+   openssl genrsa -out intermediate_key.pem 4096
+
+4. **ON DESKTOP PC: Create an intermediate certificate request:**
+   openssl req -new -key intermediate_key.pem -out intermediate_request.csr
+   (When prompted, enter details for your intermediate CA. The Common Name should be different from the root CA, like "My TAK Intermediate CA")
+
+5. **ON DESKTOP PC: Sign the intermediate certificate with the root certificate:**
+   openssl x509 -req -in intermediate_request.csr -CA root_cert.pem -CAkey root_key.pem -CAcreateserial -out intermediate_cert.pem -days 1825
+
+6. **ON DESKTOP PC: Copy the intermediate certificate to both Pi devices:**
+   scp intermediate_cert.pem pi@SERVER_A_IP:/tmp/
+   scp intermediate_cert.pem pi@SERVER_B_IP:/tmp/
+
+7. **ON EACH PI: Move the intermediate certificate to the TAK directory:**
+   sudo mv /tmp/intermediate_cert.pem /opt/tak/certs/files/
+   sudo chown tak:tak /opt/tak/certs/files/intermediate_cert.pem
+   sudo chmod 640 /opt/tak/certs/files/intermediate_cert.pem
+
 
 ### Step 1: Create Server Certificates (ALL ON DESKTOP PC)
 
