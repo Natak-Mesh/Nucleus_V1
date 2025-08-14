@@ -1,0 +1,116 @@
+# TAK Server ATAK Certificate Connection Troubleshooting
+
+## Problem Description
+- ATAK clients unable to connect to TAK server on port 8089
+- Error message in ATAK: "IO error, reconnecting"
+- Server logs showing: "Certificate error: peer not verified"
+- Web admin interface (port 8443) working correctly
+- Client certificates properly enrolled in server database
+
+## Troubleshooting Steps
+
+### 1. Verify Client Certificate Enrollment
+Check if the client certificate is properly enrolled in the server:
+
+```bash
+java -jar /opt/tak/utils/UserManager.jar certmod -s /opt/tak/certs/files/EUD1.pem
+```
+
+**Expected Output:**
+```
+Username:      'EUD1'
+Role:          ROLE_ANONYMOUS
+Fingerprint:   58:01:39:56:41:80:90:9C:1A:B2:83:BF:0D:0E:A5:C0:96:B9:E9:C6:9F:90:8A:61:DC:64:6B:42:2F:1E:CC:56
+Groups (read and write permission):        
+        __ANON__
+```
+
+### 2. Check Server Configuration
+Examine the server's certificate configuration:
+
+```bash
+grep -r "clientAuth\|truststore\|keystore" /opt/tak/CoreConfig.xml
+```
+
+### 3. Analyze Server's Truststore
+Check what certificates the server trusts:
+
+```bash
+keytool -list -keystore /opt/tak/certs/files/truststore-root.jks -storepass atakatak -v
+```
+
+### 4. Examine Server's Certificate Chain
+Check the server's keystore and certificate chain:
+
+```bash
+keytool -list -keystore /opt/tak/certs/files/takserver.jks -storepass atakatak -v
+```
+
+## Root Cause Analysis
+
+The issue was identified by comparing the certificate chains:
+
+**Server's Certificate Chain:**
+- takserver cert → signed by TAK-ID-CA-01 (intermediate) → signed by TAK-ROOT-CA-01 (root)
+
+**Server's Truststore (before fix):**
+- Only contained TAK-ROOT-CA-01 (root CA)
+- Missing TAK-ID-CA-01 (intermediate CA)
+
+**Client Certificate (EUD1):**
+- Was signed by TAK-ID-CA-01 (intermediate CA)
+
+**The Problem:**
+The server couldn't validate the client certificate because it was missing the intermediate CA (TAK-ID-CA-01) in its truststore. The server only had the root CA but needed the intermediate CA that actually signed the client certificates.
+
+## Solution
+
+Add the intermediate CA certificate to the server's truststore:
+
+```bash
+sudo keytool -import -alias tak-id-ca-01 -file /opt/tak/certs/files/TAK-ID-CA-01.pem -keystore /opt/tak/certs/files/truststore-root.jks -storepass atakatak
+```
+
+Verify the certificate was added:
+
+```bash
+keytool -list -keystore /opt/tak/certs/files/truststore-root.jks -storepass atakatak
+```
+
+**Expected Output (after fix):**
+```
+Your keystore contains 2 entries
+
+tak-id-ca-01, 14 Aug 2025, trustedCertEntry, 
+Certificate fingerprint (SHA-256): 9A:18:46:D5:0D:3C:3B:A6:8C:00:55:A9:7D:15:82:01:10:A0:69:26:2A:E5:CF:22:48:AC:9C:3F:5B:3B:A8:FD
+
+tak-root-ca-01, 14 Aug 2025, trustedCertEntry, 
+Certificate fingerprint (SHA-256): 0A:00:9E:E9:D5:2C:1B:05:AB:CC:74:CF:11:7E:83:46:7A:D8:F1:05:D9:C2:1D:7D:7E:B8:CC:4F:E9:4B:3E:A0
+```
+
+Restart the TAK server:
+
+```bash
+sudo systemctl restart takserver
+```
+
+## Key Learnings
+
+1. **Certificate Chain Validation:** SSL/TLS requires the complete certificate chain to be available for validation
+2. **Intermediate CA Importance:** Even if the root CA is trusted, intermediate CAs must also be present in the truststore
+3. **Different Services, Different Requirements:** Web admin and streaming services may have different certificate validation behavior
+4. **Proper Troubleshooting:** Always check the complete certificate chain when troubleshooting SSL issues
+
+## Prevention
+
+When setting up TAK server certificates:
+1. Always include both root and intermediate CAs in the truststore
+2. Verify the complete certificate chain is present
+3. Test both web admin and ATAK client connections after certificate changes
+4. Document the certificate hierarchy for future reference
+
+## Additional Notes
+
+- The issue occurred because the server's certificate chain included the intermediate CA, but the truststore only contained the root CA
+- Client certificates signed by the intermediate CA couldn't be validated without the intermediate CA being present in the truststore
+- This is a common SSL certificate validation issue in PKI environments with multiple certificate authority levels
