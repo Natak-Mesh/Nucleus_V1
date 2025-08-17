@@ -1,0 +1,1 @@
+tail -f /opt/tak/logs/takserver-messaging.log
