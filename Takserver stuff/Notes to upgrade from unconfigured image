@@ -1,0 +1,5 @@
+sudo apt install ufw <br>
+follow https://mytecknet.com/lets-build-a-tak-server/#post-configuration-tasks  beginning at "post configuration tasks" <br>
+have already edited cd /opt/tak/certs/cert-metadata.sh w/natak info <br>
+use whaterver name you want for root and itnermediate certs, but the server cert needs to be "takserver" unless you want to edit core-config <br>
+make sure you also let port 5000 through firewall for flask web page and 9001 for federation
