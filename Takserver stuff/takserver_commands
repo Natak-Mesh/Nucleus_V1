@@ -1,1 +1,6 @@
 tail -f /opt/tak/logs/takserver-messaging.log
+
+# change role of client
+java -jar /opt/tak/utils/UserManager.jar certmod -g __ANON__ /opt/tak/certs/files/<clientCert>.pem
+
+where __ANON__ is the default role
