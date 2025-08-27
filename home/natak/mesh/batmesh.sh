@@ -25,6 +25,11 @@ ifconfig wlan1 up
 #increase wlan1 MTU to account for BATMAN-ADV overhead 
 sudo ip link set dev wlan1 mtu 1560
 
+# Set fragmentation threshold for better reliability at range, test this
+# shrinking packet size reduces tx time of each individual packet, less time for something
+# to get corrupted. but cuts throughput due to all the additional headers
+#iwconfig wlan1 frag 1024
+
 #wpa_supplicant for encryption only
 wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.conf
 
