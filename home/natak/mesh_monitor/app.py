@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
 import socket
 import subprocess
 import json
@@ -6,6 +6,21 @@ import time
 import os
 
 app = Flask(__name__)
+
+# WiFi Channel to Frequency Mapping
+WIFI_CHANNELS = {
+    # 2.4 GHz
+    1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437,
+    7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462, 12: 2467, 13: 2472, 14: 2484,
+    
+    # 5 GHz (common channels)
+    36: 5180, 40: 5200, 44: 5220, 48: 5240,
+    52: 5260, 56: 5280, 60: 5300, 64: 5320,
+    100: 5500, 104: 5520, 108: 5540, 112: 5560,
+    116: 5580, 120: 5600, 124: 5620, 128: 5640,
+    132: 5660, 136: 5680, 140: 5700, 144: 5720,
+    149: 5745, 153: 5765, 157: 5785, 161: 5805, 165: 5825
+}
 
 # Configuration
 NODE_TIMEOUT = 30  # Seconds - nodes not seen within this time will be greyed out
@@ -28,17 +43,46 @@ def read_node_status():
         print(f"Error reading node_status.json: {e}")
         return {}
 
+def get_current_channel():
+    """Read current channel from batmesh.sh"""
+    try:
+        with open('/home/natak/mesh/batmesh.sh', 'r') as f:
+            for line in f:
+                if line.startswith('MESH_CHANNEL='):
+                    return int(line.split('=')[1].strip())
+    except:
+        return 11  # default
+
+def update_batmesh_channel(new_channel):
+    """Update channel in batmesh.sh using sed"""
+    cmd = f'sed -i "s/^MESH_CHANNEL=.*/MESH_CHANNEL={new_channel}/" /home/natak/mesh/batmesh.sh'
+    return subprocess.run(cmd, shell=True, capture_output=True)
+
+def update_wpa_supplicant_frequency(new_frequency):
+    """Update frequency in wpa_supplicant config using sed"""
+    cmd = f'sed -i "s/frequency=.*/frequency={new_frequency}/" /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.conf'
+    return subprocess.run(cmd, shell=True, capture_output=True)
+
+def reboot_system():
+    """Reboot the system to apply changes"""
+    return subprocess.run(['sudo', 'reboot'], capture_output=True)
+
 
 
 @app.route('/')
 def wifi_page():
     """Default WiFi page showing node status"""
     node_status = read_node_status()
+    current_channel = get_current_channel()
+    current_frequency = WIFI_CHANNELS.get(current_channel, 2462)
     return render_template('wifi.html', 
                          hostname=socket.gethostname(),
                          local_mac=get_local_mac(),
                          node_status=node_status,
-                         node_timeout=NODE_TIMEOUT)
+                         node_timeout=NODE_TIMEOUT,
+                         current_channel=current_channel,
+                         current_frequency=current_frequency,
+                         available_channels=list(WIFI_CHANNELS.keys()))
 
 
 def parse_log_line(line):
@@ -115,6 +159,54 @@ def api_packet_logs():
         'hostname': socket.gethostname(),
         'logs': read_packet_logs()
     })
+
+@app.route('/api/mesh-config', methods=['GET'])
+def get_mesh_config():
+    """Get current mesh configuration"""
+    current_channel = get_current_channel()
+    current_frequency = WIFI_CHANNELS.get(current_channel, 2462)
+    
+    return jsonify({
+        'current_channel': current_channel,
+        'current_frequency': current_frequency,
+        'available_channels': list(WIFI_CHANNELS.keys())
+    })
+
+@app.route('/api/mesh-config', methods=['POST'])
+def set_mesh_config():
+    """Change mesh channel"""
+    try:
+        data = request.get_json()
+        new_channel = int(data.get('channel'))
+        
+        # Validate channel
+        if new_channel not in WIFI_CHANNELS:
+            return jsonify({'error': 'Invalid channel'}), 400
+            
+        new_frequency = WIFI_CHANNELS[new_channel]
+        
+        # Update both config files
+        batmesh_result = update_batmesh_channel(new_channel)
+        wpa_result = update_wpa_supplicant_frequency(new_frequency)
+        
+        if batmesh_result.returncode != 0 or wpa_result.returncode != 0:
+            return jsonify({'error': 'Failed to update configuration'}), 500
+            
+        # Reboot system to apply changes
+        reboot_result = reboot_system()
+        
+        if reboot_result.returncode != 0:
+            return jsonify({'error': 'Failed to reboot system'}), 500
+            
+        return jsonify({
+            'success': True,
+            'channel': new_channel,
+            'frequency': new_frequency,
+            'message': 'Channel changed successfully. System is rebooting.'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
