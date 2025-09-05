@@ -20,7 +20,7 @@ sudo systemctl restart systemd-networkd
 
 # ------------------------------------------------------------------------------
 # For fresh build install required packages
-sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip
+sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip aircrack-ng iperf3 ufw
 
 # Install Reticulum
 pip3 install --break-system-packages rns 
@@ -62,7 +62,9 @@ sudo apt update && sudo apt install -y \
     batctl \
     python3 \
     python3-pip \
-    wpa_supplicant
+    wpa_supplicant \
+    aircrack-ng \
+    ufw
 
 | Package | Description |
 |---------|-------------|
@@ -71,6 +73,9 @@ sudo apt update && sudo apt install -y \
 | python3 | Python 3 runtime |
 | python3-pip | Python package installer |
 | wpa_supplicant | WPA/WPA2/WPA3 encryption for the mesh network |
+| aircrack-ng | wifi monitoring/scanning
+| ufw | uncomplicated firewall, for takserver install
+| iperf3 | connection performance testing
 
 ## Python Packages (Install via pip3)
 
