@@ -85,10 +85,15 @@ pip3 install --break-system-packages rns
 # Flask web framework
 sudo pip3 install --break-system-packages flask
 
+# Meshtastic CLI tools
+ pip3 install --upgrade pytap2 --break-system-packages
+ pip3 install --upgrade "meshtastic[cli]" --break-system-packages
+
 | Package | Description |
 |---------|-------------|
 | rns | Reticulum Network Stack for mesh networking |
 | flask | Web framework for the mesh monitor web interface |
+| meshtastic | tools to interface with USB connected meshtastic radio
 
 ## Optional Software
 
