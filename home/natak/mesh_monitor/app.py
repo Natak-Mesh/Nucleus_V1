@@ -67,21 +67,46 @@ def reboot_system():
     """Reboot the system to apply changes"""
     return subprocess.run(['sudo', 'reboot'], capture_output=True)
 
+def get_current_ip():
+    """Read current IP from br0.network"""
+    try:
+        with open('/etc/systemd/network/br0.network', 'r') as f:
+            for line in f:
+                if line.startswith('Address='):
+                    # Extract IP without subnet mask
+                    return line.split('=')[1].strip().split('/')[0]
+    except:
+        return "10.20.1.2"  # default
+
+def update_br0_ip(new_ip):
+    """Update IP in br0.network using sed"""
+    cmd = f'sed -i "s/^Address=.*/Address={new_ip}\/24/" /etc/systemd/network/br0.network'
+    return subprocess.run(cmd, shell=True, capture_output=True)
+
 
 
 @app.route('/')
 def wifi_page():
     """Default WiFi page showing node status"""
     node_status = read_node_status()
-    current_channel = get_current_channel()
-    current_frequency = WIFI_CHANNELS.get(current_channel, 2462)
     return render_template('wifi.html', 
                          hostname=socket.gethostname(),
                          local_mac=get_local_mac(),
                          node_status=node_status,
-                         node_timeout=NODE_TIMEOUT,
+                         node_timeout=NODE_TIMEOUT)
+
+@app.route('/management')
+def management_page():
+    """Management page for mesh configuration"""
+    current_channel = get_current_channel()
+    current_frequency = WIFI_CHANNELS.get(current_channel, 2462)
+    current_ip = get_current_ip()
+    return render_template('management.html', 
+                         hostname=socket.gethostname(),
+                         local_mac=get_local_mac(),
                          current_channel=current_channel,
                          current_frequency=current_frequency,
+                         current_ip=current_ip,
                          available_channels=list(WIFI_CHANNELS.keys()))
 
 
@@ -172,6 +197,67 @@ def get_mesh_config():
         'available_channels': list(WIFI_CHANNELS.keys())
     })
 
+@app.route('/api/node-ip', methods=['GET'])
+def get_node_ip():
+    """Get current node IP configuration"""
+    current_ip = get_current_ip()
+    
+    return jsonify({
+        'current_ip': current_ip
+    })
+
+@app.route('/api/reboot', methods=['POST'])
+def reboot_node():
+    """Reboot the node"""
+    try:
+        reboot_result = reboot_system()
+        
+        if reboot_result.returncode != 0:
+            return jsonify({'error': 'Failed to reboot system'}), 500
+            
+        return jsonify({
+            'success': True,
+            'message': 'System is rebooting...'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/node-ip', methods=['POST'])
+def set_node_ip():
+    """Change node IP address"""
+    try:
+        data = request.get_json()
+        new_ip = data.get('ip')
+        
+        # Basic IP validation
+        ip_parts = new_ip.split('.')
+        if len(ip_parts) != 4:
+            return jsonify({'error': 'Invalid IP format'}), 400
+            
+        for part in ip_parts:
+            try:
+                num = int(part)
+                if num < 0 or num > 255:
+                    return jsonify({'error': 'Invalid IP format'}), 400
+            except ValueError:
+                return jsonify({'error': 'Invalid IP format'}), 400
+        
+        # Update IP in br0.network
+        result = update_br0_ip(new_ip)
+        
+        if result.returncode != 0:
+            return jsonify({'error': 'Failed to update IP address'}), 500
+            
+        return jsonify({
+            'success': True,
+            'ip': new_ip,
+            'message': 'IP address updated successfully.'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/mesh-config', methods=['POST'])
 def set_mesh_config():
     """Change mesh channel"""
@@ -192,17 +278,11 @@ def set_mesh_config():
         if batmesh_result.returncode != 0 or wpa_result.returncode != 0:
             return jsonify({'error': 'Failed to update configuration'}), 500
             
-        # Reboot system to apply changes
-        reboot_result = reboot_system()
-        
-        if reboot_result.returncode != 0:
-            return jsonify({'error': 'Failed to reboot system'}), 500
-            
         return jsonify({
             'success': True,
             'channel': new_channel,
             'frequency': new_frequency,
-            'message': 'Channel changed successfully. System is rebooting.'
+            'message': 'Channel changed successfully. Node must be rebooted to apply changes.'
         })
         
     except Exception as e:
