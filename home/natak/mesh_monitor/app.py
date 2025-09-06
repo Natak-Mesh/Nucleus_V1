@@ -73,13 +73,20 @@ def reboot_system():
 def wifi_page():
     """Default WiFi page showing node status"""
     node_status = read_node_status()
-    current_channel = get_current_channel()
-    current_frequency = WIFI_CHANNELS.get(current_channel, 2462)
     return render_template('wifi.html', 
                          hostname=socket.gethostname(),
                          local_mac=get_local_mac(),
                          node_status=node_status,
-                         node_timeout=NODE_TIMEOUT,
+                         node_timeout=NODE_TIMEOUT)
+
+@app.route('/management')
+def management_page():
+    """Management page for mesh configuration"""
+    current_channel = get_current_channel()
+    current_frequency = WIFI_CHANNELS.get(current_channel, 2462)
+    return render_template('management.html', 
+                         hostname=socket.gethostname(),
+                         local_mac=get_local_mac(),
                          current_channel=current_channel,
                          current_frequency=current_frequency,
                          available_channels=list(WIFI_CHANNELS.keys()))
