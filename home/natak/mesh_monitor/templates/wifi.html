@@ -347,6 +347,7 @@
         </div>
         <div class="nav">
             <a href="/" class="active">WiFi</a>
+            <a href="/management">Management</a>
         </div>
     </div>
 
@@ -365,24 +366,5 @@
         </div>
     </div>
 
-    <div class="section">
-        <h2>Mesh Configuration</h2>
-        <div class="config-controls">
-            <div class="current-config">
-                <strong>Current Channel:</strong> <span id="current-channel">{{ current_channel }}</span> 
-                (<span id="current-frequency">{{ current_frequency }}</span> MHz)
-            </div>
-            
-            <div class="channel-selector">
-                <label for="channel-select">Change Channel:</label>
-                <select id="channel-select">
-                    <!-- Populated by JavaScript -->
-                </select>
-                <button id="apply-channel" onclick="changeChannel()">Apply Channel</button>
-            </div>
-            
-            <div id="config-status" class="status-message"></div>
-        </div>
-    </div>
 </body>
 </html>
