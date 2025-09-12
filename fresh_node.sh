@@ -26,6 +26,8 @@ sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip aircra
 pip3 install --break-system-packages rns 
 # you need to install and start rns/rnsd at least once, auto start script now will start it and the git tracked config file
 pip3 install nomadnet --break-system-packages
+#install included config after nomandet has run once or manually adjust node name and enable propagation
+
 
 # Install Flask system-wide for systemd services
 sudo pip3 install --break-system-packages flask
