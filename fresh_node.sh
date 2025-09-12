@@ -68,7 +68,7 @@ sudo apt update && sudo apt install -y \
     wpa_supplicant \
     aircrack-ng \
     ufw \
-    shellinabox
+  
 
 | Package | Description |
 |---------|-------------|
@@ -78,9 +78,8 @@ sudo apt update && sudo apt install -y \
 | python3-pip | Python package installer |
 | wpa_supplicant | WPA/WPA2/WPA3 encryption for the mesh network |
 | aircrack-ng | wifi monitoring/scanning
-| ufw | uncomplicated firewall, for takserver install #open ports for takserver, 5000 for web page and 4200 for shellinabox. maybe more
+| ufw | uncomplicated firewall, for takserver install #open ports for takserver, 5000 for web page maybe more
 | iperf3 | connection performance testing
-| shellinabox | web terminal to access nomadnet #dont forget to edit config /etc/default/shellinabox default port 4200 for ufw
 
 ## Python Packages (Install via pip3)
 
