@@ -67,7 +67,8 @@ sudo apt update && sudo apt install -y \
     python3-pip \
     wpa_supplicant \
     aircrack-ng \
-    ufw
+    ufw \
+    shellinabox
 
 | Package | Description |
 |---------|-------------|
@@ -79,11 +80,15 @@ sudo apt update && sudo apt install -y \
 | aircrack-ng | wifi monitoring/scanning
 | ufw | uncomplicated firewall, for takserver install
 | iperf3 | connection performance testing
+| shellinabox | web terminal to access nomadnet #dont forget to edit config /etc/default/shellinabox
 
 ## Python Packages (Install via pip3)
 
-# Reticulum Network Stack
+# Reticulum Network Stack config needs to be edited
 pip3 install --break-system-packages rns
+
+#nomadnet install config needs to be edited
+pip3 install nomadnet --break-system-packages
 
 # Flask web framework
 sudo pip3 install --break-system-packages flask
