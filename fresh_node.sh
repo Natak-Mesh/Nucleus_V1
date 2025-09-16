@@ -25,6 +25,9 @@ sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip aircra
 # Install Reticulum
 pip3 install --break-system-packages rns 
 # you need to install and start rns/rnsd at least once, auto start script now will start it and the git tracked config file
+pip3 install nomadnet --break-system-packages
+#install included config after nomandet has run once or manually adjust node name and enable propagation
+
 
 # Install Flask system-wide for systemd services
 sudo pip3 install --break-system-packages flask
@@ -64,7 +67,8 @@ sudo apt update && sudo apt install -y \
     python3-pip \
     wpa_supplicant \
     aircrack-ng \
-    ufw
+    ufw \
+  
 
 | Package | Description |
 |---------|-------------|
@@ -74,13 +78,16 @@ sudo apt update && sudo apt install -y \
 | python3-pip | Python package installer |
 | wpa_supplicant | WPA/WPA2/WPA3 encryption for the mesh network |
 | aircrack-ng | wifi monitoring/scanning
-| ufw | uncomplicated firewall, for takserver install
+| ufw | uncomplicated firewall, for takserver install #open ports for takserver, 5000 for web page maybe more
 | iperf3 | connection performance testing
 
 ## Python Packages (Install via pip3)
 
-# Reticulum Network Stack
+# Reticulum Network Stack config needs to be edited
 pip3 install --break-system-packages rns
+
+#nomadnet install config needs to be edited
+pip3 install nomadnet --break-system-packages
 
 # Flask web framework
 sudo pip3 install --break-system-packages flask
