@@ -4,4 +4,4 @@
 
 This is a test page to verify linking works.
 
-[Back to Index](index.mu)
+`!`[Back to Index`:/page/index.mu]`!
