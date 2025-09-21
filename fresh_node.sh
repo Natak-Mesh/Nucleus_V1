@@ -16,6 +16,36 @@ sudo systemd-machine-id-setup
 sudo rm /etc/ssh/ssh_host_*
 sudo dpkg-reconfigure openssh-server
 sudo systemctl restart systemd-networkd
+# Clear Reticulum identity and cached data
+sudo rm -f ~/.reticulum/storage/transport_identity
+sudo rm -f ~/.reticulum/storage/destination_table
+sudo rm -f ~/.reticulum/storage/known_destinations
+sudo rm -f ~/.reticulum/storage/packet_hashlist
+sudo rm -rf ~/.reticulum/storage/ratchets/*
+sudo rm -rf ~/.reticulum/storage/cache/*
+sudo rm -rf ~/.reticulum/storage/identities/*
+sudo rm -rf ~/.reticulum/storage/tunnels
+sudo rm -rf ~/.reticulum/storage/resources/*
+
+# Clear Nomadnet identity and user data
+sudo rm -f ~/.nomadnetwork/storage/identity
+sudo rm -f ~/.nomadnetwork/storage/directory
+sudo rm -f ~/.nomadnetwork/storage/peersettings
+sudo rm -f ~/.nomadnetwork/logfile
+sudo rm -f ~/.nomadnetwork/pnannounced
+sudo rm -rf ~/.nomadnetwork/storage/conversations/*
+sudo rm -rf ~/.nomadnetwork/storage/cache/*
+sudo rm -rf ~/.nomadnetwork/storage/lxmf/ratchets/*
+sudo rm -rf ~/.nomadnetwork/storage/lxmf/messagestore/*
+sudo rm -f ~/.nomadnetwork/storage/lxmf/local_deliveries
+sudo rm -f ~/.nomadnetwork/storage/lxmf/node_stats
+sudo rm -f ~/.nomadnetwork/storage/lxmf/outbound_stamp_costs
+sudo rm -f ~/.nomadnetwork/storage/lxmf/peers
+sudo rm -rf ~/.nomadnetwork/storage/files/*
+sudo rm -rf ~/.nomadnetwork/storage/resources/*
+
+echo "Fresh node setup complete - system and Reticulum/Nomadnet identities cleared"
+
 # ******************************************************************************
 
 # ------------------------------------------------------------------------------
@@ -111,3 +141,5 @@ tar -xvzf mediamtx_linux_arm64.tar.gz
 ### TAKserver (for TAKserver nodes only)
 - Download ARM64 .deb package from tak.gov
 - Install using dpkg -i command
+
+
