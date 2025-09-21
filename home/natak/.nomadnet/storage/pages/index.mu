@@ -18,7 +18,9 @@
 
 
 
-Welcome to the Natak Mesh node.
+Welcome to the Nucleus_V1 node.
+www.natakmesh.com
+https://github.com/Natak-Mesh/Nucleus_V1
+Release v1.03
 
-`!`[Message Board`:/page/messageboard.mu]`!
 `!`[Test Page`:/page/test.mu]`!
