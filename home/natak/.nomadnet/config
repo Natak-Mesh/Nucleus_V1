@@ -1,4 +1,4 @@
-# This is the default Nomad Network config file.
+# This is the default takNode3 config. Edit as needed
 # You should probably edit it to suit your needs and use-case,
 
 [logging]
