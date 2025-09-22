@@ -167,6 +167,23 @@
             background-color: #f44336;
             color: white;
         }
+
+        .logo-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .logo-header img {
+            height: 80px;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        @media (max-width: 600px) {
+            .logo-header img {
+                height: 60px;
+            }
+        }
     </style>
     <script>
         // Channel-to-frequency mapping (same as backend)
@@ -341,11 +358,14 @@
 </head>
 <body>
     <div class="header">
-        <div>
-            <h1>{{ hostname }}</h1>
+        <div style="display: flex; align-items: center; flex: 1;">
+            <h1 style="margin: 0;">{{ hostname }}</h1>
             <div class="local-mac">Local MAC: {{ local_mac }}</div>
         </div>
-        <div class="nav">
+        <div style="display: flex; justify-content: center; flex: 1;">
+            <img src="{{ url_for('static', filename='NatakMeshsecondary-overlay.png') }}" alt="NatakMesh Logo" style="height: 60px;">
+        </div>
+        <div class="nav" style="flex: 1; display: flex; justify-content: flex-end;">
             <a href="/" class="active">WiFi</a>
             <a href="/management">Management</a>
         </div>
