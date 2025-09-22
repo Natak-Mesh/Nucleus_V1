@@ -77,6 +77,17 @@
             font-size: 14px;
             margin: 8px 0;
         }
+
+        .header {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .header img {
+                height: 50px !important;
+            }
+        }
     </style>
     <script>
         function updateData() {
@@ -135,7 +146,15 @@
     </script>
 </head>
 <body>
-    <h1>{{ hostname }}</h1>
+    <div class="header">
+        <div>
+            <img src="{{ url_for('static', filename='NatakMeshsecondary-overlay.png') }}" alt="NatakMesh Logo" style="height: 60px; vertical-align: middle; margin-right: 16px;">
+            <div style="display: inline-block; vertical-align: middle;">
+                <h1 style="margin: 0;">{{ hostname }}</h1>
+            </div>
+        </div>
+    </div>
+    
     <a href="/packet-logs">View Packet Logs →</a>
 
     <div class="section">
