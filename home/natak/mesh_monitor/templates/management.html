@@ -23,7 +23,7 @@
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: stretch;
             margin-bottom: 24px;
         }
 
@@ -156,6 +156,32 @@
         @media (max-width: 600px) {
             .logo-header img {
                 height: 60px;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .header img {
+                height: 50px !important;
+            }
+            
+            .header > div {
+                flex: none !important;
+            }
+            
+            .header > div:nth-child(1) {
+                order: 2;
+            }
+            
+            .header > div:nth-child(2) {
+                order: 1;
+            }
+            
+            .header > div:nth-child(3) {
+                order: 3;
             }
         }
     </style>
@@ -422,12 +448,12 @@
 </head>
 <body>
     <div class="header">
-        <div style="display: flex; align-items: center; flex: 1;">
+        <div style="display: flex; flex-direction: column; align-items: flex-start; flex: 1;">
             <h1 style="margin: 0;">{{ hostname }}</h1>
             <div class="local-mac">Local MAC: {{ local_mac }}</div>
         </div>
-        <div style="display: flex; justify-content: center; flex: 1;">
-            <img src="{{ url_for('static', filename='NatakMeshsecondary-overlay.png') }}" alt="NatakMesh Logo" style="height: 60px;">
+        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; flex: 1;">
+            <img src="{{ url_for('static', filename='NatakMeshsecondary-overlay.png') }}" alt="NatakMesh Logo" style="height: 80px;">
         </div>
         <div class="nav" style="flex: 1; display: flex; justify-content: flex-end;">
             <a href="/">WiFi</a>
@@ -475,29 +501,3 @@
                     placeholder="{{ current_ip }}" 
                     pattern="^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$"
                     style="background-color: var(--background-color); color: var(--text-color); border: 1px solid #444; padding: 8px; border-radius: 4px;"
-                >
-                <button id="apply-ip" onclick="changeIp()">Apply IP</button>
-            </div>
-            
-            <div class="disclaimer" style="font-size: 14px; color: #ff9800; margin-top: 8px;">
-                Note: Node must be rebooted for IP changes to take effect.
-            </div>
-            
-            <div id="ip-status" class="status-message"></div>
-        </div>
-    </div>
-    
-    <div class="section">
-        <h2>Node Control</h2>
-        <div class="config-controls">
-            <div style="display: flex; justify-content: center; margin: 16px 0;">
-                <button id="reboot-node" onclick="rebootNode()">Reboot Node</button>
-            </div>
-            <div class="disclaimer" style="font-size: 14px; color: #ff9800; margin-top: 8px; text-align: center;">
-                Warning: Rebooting will disconnect all nodes and interrupt service.
-            </div>
-            <div id="reboot-status" class="status-message"></div>
-        </div>
-    </div>
-</body>
-</html>
