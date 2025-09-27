@@ -105,8 +105,8 @@
                         nodeGrid.innerHTML += `
                             <div class="node-card">
                                 <h3>${node.hostname}</h3>
+                                <div class="stats">${mac}</div>
                                 <div class="stats">IP: ${node.ip}</div>
-                                <div class="stats">MAC: ${mac}</div>
                                 <div class="stats">Mode: <span class="mode-${node.mode.toLowerCase()}">${node.mode}</span></div>
                                 <div class="stats">Last Seen: ${node.last_seen.toFixed(2)}s</div>
                                 <div class="stats">Throughput: ${node.throughput.toFixed(1)}</div>
@@ -163,8 +163,8 @@
             {% for mac, node in node_status.items() %}
             <div class="node-card">
                 <h3>{{ node.hostname }}</h3>
+                <div class="stats">{{ mac }}</div>
                 <div class="stats">IP: {{ node.ip }}</div>
-                <div class="stats">MAC: {{ mac }}</div>
                 <div class="stats">Mode: <span class="mode-{{ node.mode.lower() }}">{{ node.mode }}</span></div>
                 <div class="stats">Last Seen: {{ "%.2f"|format(node.last_seen) }}s</div>
                 <div class="stats">Throughput: {{ "%.1f"|format(node.throughput) }}</div>
