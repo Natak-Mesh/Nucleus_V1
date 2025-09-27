@@ -23,7 +23,7 @@
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: stretch;
             margin-bottom: 24px;
         }
 
@@ -182,6 +182,32 @@
         @media (max-width: 600px) {
             .logo-header img {
                 height: 60px;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .header img {
+                height: 50px !important;
+            }
+            
+            .header > div {
+                flex: none !important;
+            }
+            
+            .header > div:nth-child(1) {
+                order: 2;
+            }
+            
+            .header > div:nth-child(2) {
+                order: 1;
+            }
+            
+            .header > div:nth-child(3) {
+                order: 3;
             }
         }
     </style>
@@ -358,33 +384,7 @@
 </head>
 <body>
     <div class="header">
-        <div style="display: flex; align-items: center; flex: 1;">
+        <div style="display: flex; flex-direction: column; align-items: flex-start; flex: 1;">
             <h1 style="margin: 0;">{{ hostname }}</h1>
             <div class="local-mac">Local MAC: {{ local_mac }}</div>
-        </div>
-        <div style="display: flex; justify-content: center; flex: 1;">
-            <img src="{{ url_for('static', filename='NatakMeshsecondary-overlay.png') }}" alt="NatakMesh Logo" style="height: 60px;">
-        </div>
-        <div class="nav" style="flex: 1; display: flex; justify-content: flex-end;">
-            <a href="/" class="active">WiFi</a>
-            <a href="/management">Management</a>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>BATMAN Mesh Status</h2>
-        <div class="node-grid">
-            {% for mac, node in node_status.items() %}
-            {% set is_inactive = node.last_seen > node_timeout %}
-            <div class="node-card{% if is_inactive %} inactive{% endif %}">
-                <h3><span class="status-indicator {% if is_inactive %}status-inactive{% else %}status-active{% endif %}"></span>{{ mac }}</h3>
-                <div class="stats">Last Seen: {{ "%.2f"|format(node.last_seen) }}s ago</div>
-                <div class="stats">Throughput: {{ "%.1f"|format(node.throughput) }} Mbps</div>
-                <div class="stats">Next Hop: {{ node.nexthop }}</div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-</body>
-</html>
+       
