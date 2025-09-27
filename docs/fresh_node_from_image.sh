@@ -16,6 +16,8 @@ sudo systemd-machine-id-setup
 sudo rm /etc/ssh/ssh_host_*
 sudo dpkg-reconfigure openssh-server
 sudo systemctl restart systemd-networkd
+sudo sed -i '/127\.0\.1\.1/d' /etc/hosts
+
 # Clear Reticulum identity and cached data
 sudo rm -f ~/.reticulum/storage/transport_identity
 sudo rm -f ~/.reticulum/storage/destination_table
