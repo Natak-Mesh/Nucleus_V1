@@ -18,6 +18,10 @@ sudo dpkg-reconfigure openssh-server
 sudo systemctl restart systemd-networkd
 sudo sed -i '/127\.0\.1\.1/d' /etc/hosts
 
+# Clean up vscode storage
+rm -rf ~/.vscode
+rm -rf ~/.config/Code
+
 # Clear Reticulum identity and cached data
 sudo rm -f ~/.reticulum/storage/transport_identity
 sudo rm -f ~/.reticulum/storage/destination_table
