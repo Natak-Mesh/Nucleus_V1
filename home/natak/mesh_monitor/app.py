@@ -11,15 +11,7 @@ app = Flask(__name__)
 WIFI_CHANNELS = {
     # 2.4 GHz
     1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437,
-    7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462, 12: 2467, 13: 2472, 14: 2484,
-    
-    # 5 GHz (common channels)
-    36: 5180, 40: 5200, 44: 5220, 48: 5240,
-    52: 5260, 56: 5280, 60: 5300, 64: 5320,
-    100: 5500, 104: 5520, 108: 5540, 112: 5560,
-    116: 5580, 120: 5600, 124: 5620, 128: 5640,
-    132: 5660, 136: 5680, 140: 5700, 144: 5720,
-    149: 5745, 153: 5765, 157: 5785, 161: 5805, 165: 5825
+    7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462, 12: 2467, 13: 2472, 14: 2484
 }
 
 # Configuration
@@ -110,62 +102,6 @@ def management_page():
                          available_channels=list(WIFI_CHANNELS.keys()))
 
 
-def parse_log_line(line):
-    try:
-        # Extract timestamp and message
-        parts = line.split(" - ", 1)
-        if len(parts) != 2:
-            return None
-            
-        timestamp = parts[0].split()[1]  # Get HH:MM:SS
-        message = parts[1].strip()
-        
-        # Determine message type
-        msg_type = "default"
-        if "UDP RECEIVE:" in message:
-            msg_type = "udp"
-        elif "ATAK to LoRa:" in message:
-            msg_type = "atak-to-lora"
-        elif "LoRa to ATAK:" in message:
-            msg_type = "lora-to-atak"
-        elif "Received packet" in message:
-            msg_type = "received"
-        elif "delivered to" in message:
-            msg_type = "delivered"
-        elif "All nodes received" in message:
-            msg_type = "complete"
-        elif "Retrying packet" in message:
-            msg_type = "retry"
-            
-        return {
-            'time': timestamp,
-            'message': message,
-            'type': msg_type
-        }
-    except Exception:
-        return None
-
-def read_packet_logs():
-    try:
-        with open('/var/log/reticulum/packet_logs.log', 'r') as f:
-            lines = f.readlines()
-            logs = []
-            for line in lines:
-                parsed = parse_log_line(line)
-                # Only add logs that aren't of the types we want to filter out
-                if parsed and parsed['type'] not in ['udp', 'atak-to-lora', 'lora-to-atak']:
-                    logs.append(parsed)
-            return logs
-    except Exception as e:
-        print(f"Error reading packet_logs.log: {e}")
-        return []
-
-@app.route('/packet-logs')
-def packet_logs():
-    logs = read_packet_logs()
-    return render_template('packet_logs.html', 
-                         hostname=socket.gethostname(),
-                         logs=logs)
 
 @app.route('/api/wifi')
 def api_wifi():
@@ -178,12 +114,6 @@ def api_wifi():
     })
 
 
-@app.route('/api/packet-logs')
-def api_packet_logs():
-    return jsonify({
-        'hostname': socket.gethostname(),
-        'logs': read_packet_logs()
-    })
 
 @app.route('/api/mesh-config', methods=['GET'])
 def get_mesh_config():
@@ -291,3 +221,4 @@ def set_mesh_config():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+
