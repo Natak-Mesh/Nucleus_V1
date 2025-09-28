@@ -24,6 +24,7 @@ Basic Nomadnet instance installed<br>
 Onboard stand alone RAK4631 LoRa radio w/ Meshtastic firmware standard<br>
 Takserver 5.3 installed but not enabled or configured<br>
 Meshtastic CLI installed<br>
+Aircrack-ng installed<br>
 MediaMTX installed and auto starting<br>
 iperf3 installed for throughput testing<br>
 ufw installed <br>
