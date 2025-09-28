@@ -190,15 +190,7 @@
         const WIFI_CHANNELS = {
             // 2.4 GHz
             1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437,
-            7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462, 12: 2467, 13: 2472, 14: 2484,
-            
-            // 5 GHz (common channels)
-            36: 5180, 40: 5200, 44: 5220, 48: 5240,
-            52: 5260, 56: 5280, 60: 5300, 64: 5320,
-            100: 5500, 104: 5520, 108: 5540, 112: 5560,
-            116: 5580, 120: 5600, 124: 5620, 128: 5640,
-            132: 5660, 136: 5680, 140: 5700, 144: 5720,
-            149: 5745, 153: 5765, 157: 5785, 161: 5805, 165: 5825
+            7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462, 12: 2467, 13: 2472, 14: 2484
         };
 
         function loadMeshConfig() {
@@ -501,3 +493,29 @@
                     placeholder="{{ current_ip }}" 
                     pattern="^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$"
                     style="background-color: var(--background-color); color: var(--text-color); border: 1px solid #444; padding: 8px; border-radius: 4px;"
+                >
+                <button id="apply-ip" onclick="changeIp()">Apply IP</button>
+            </div>
+            
+            <div class="disclaimer" style="font-size: 14px; color: #ff9800; margin-top: 8px;">
+                Note: Node must be rebooted for IP changes to take effect.
+            </div>
+            
+            <div id="ip-status" class="status-message"></div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Node Control</h2>
+        <div class="config-controls">
+            <div style="display: flex; justify-content: center; margin: 16px 0;">
+                <button id="reboot-node" onclick="rebootNode()">Reboot Node</button>
+            </div>
+            <div class="disclaimer" style="font-size: 14px; color: #ff9800; margin-top: 8px; text-align: center;">
+                Warning: Rebooting will disconnect all nodes and interrupt service.
+            </div>
+            <div id="reboot-status" class="status-message"></div>
+        </div>
+    </div>
+</body>
+</html>
