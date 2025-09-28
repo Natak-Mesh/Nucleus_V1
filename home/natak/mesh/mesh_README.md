@@ -8,9 +8,9 @@
        ...         ....        ..   
 
 #############################################
-#        N A T A K   -   Nucleus V1         #
-#                                           #
-#           Mesh Networking Radio           #
+       N A T A K   -   Nucleus V1         
+                                         
+          Mesh Networking Radio           
 #############################################
 
 
