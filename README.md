@@ -1,4 +1,19 @@
-V1.0 <br>
+#       ..        .....        ...       
+#       ....     ......       ....      
+#       .......... ...       .....       
+#       ........    ..      ......       
+#       ......      ..     .......       
+#       .....       ...  .........       
+#       ....        .....     ....      
+#       ...         ....        ..   
+
+#############################################
+#        N A T A K   -   Nucleus V1         #
+#                                           #
+#           Mesh Networking Radio           #
+#############################################
+
+V1.03 <br>
 
 State of release<br>
 
@@ -6,8 +21,10 @@ State of release<br>
 Onboard web page for mesh monitoring and channel control <node IP>:5000
 Internal wifi card provides AP to connect EUD(s) to Wi-Fi Mesh network<br>
 Reticulum installed, transport instance configured to run on Wi-Fi mesh and EHT0<br>
+Basic Nomadnet instance installed<br>
 Onboard stand alone RAK4631 LoRa radio w/ Meshtastic firmware standard<br>
-Takserver installed but not enabled or configured<br>
+Takserver 5.3 installed but not enabled or configured<br>
+Meshtastic CLI installed<br>
 MediaMTX installed and auto starting<br>
 iperf3 installed for throughput testing<br>
 ufw installed <br>
