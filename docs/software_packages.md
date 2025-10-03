@@ -1,35 +1,77 @@
-# ------------------------------------------------------------------------------
-# For fresh build install required apt packages
+# Software Packages
+
+## Initial Setup
+
+### Update and Install Core Packages
+
+```bash
 sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip aircrack-ng iperf3 ufw
+```
 
-# Install Reticulum
-pip3 install --break-system-packages rns # you need to install and start rns/rnsd at least once to generate config
-# Install Nomadnet
-pip3 install nomadnet --break-system-packages # update config after starting nomadnet once
+## Python Packages
 
+### Reticulum
+
+```bash
+# Install Reticulum (must start rns/rnsd at least once to generate config)
+pip3 install --break-system-packages rns
+```
+
+### Nomadnet
+
+```bash
+# Install Nomadnet (update config after starting nomadnet once)
+pip3 install nomadnet --break-system-packages
+```
+
+### Flask
+
+```bash
 # Install Flask system-wide for systemd services
 sudo pip3 install --break-system-packages flask
+```
 
-# Meshtastic CLI tools
- pip3 install --upgrade pytap2 --break-system-packages
- pip3 install --upgrade "meshtastic[cli]" --break-system-packages
+### Meshtastic CLI Tools
 
-# Add ~/.local/bin to PATH for pip-installed scripts
+```bash
+pip3 install --upgrade pytap2 --break-system-packages
+pip3 install --upgrade "meshtastic[cli]" --break-system-packages
+```
+
+## Environment Configuration
+
+### Add ~/.local/bin to PATH
+
+```bash
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+```
 
-# Enable NetworkManager
+## System Services
+
+### Enable NetworkManager
+
+```bash
 sudo systemctl enable NetworkManager
-# system wpa_supplicant may need to be disabled to its not running in parallel with the one you use for wlan1
-# dont forget to unmask and enable hostapd
+```
 
-# TAKserver
-# *****Download and install TAKserver arm64 .deb from tak.gov******
-# Install using dpkg -i command
+**Note:** System wpa_supplicant may need to be disabled so it's not running in parallel with the one used for wlan1. Don't forget to unmask and enable hostapd.
 
-# media mtx 
+## Additional Software
+
+### TAKserver
+
+Download and install TAKserver arm64 .deb from [tak.gov](https://tak.gov)
+
+```bash
+# Install using dpkg
+sudo dpkg -i takserver-*.deb
+```
+
+### MediaMTX
+
+```bash
 # Download latest MediaMTX release for ARM64
 wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64.tar.gz
+
 # Extract it
 tar -xvzf mediamtx_linux_arm64.tar.gz
-
-
