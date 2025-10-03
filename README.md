@@ -5,11 +5,11 @@
                                                         ......      ..     .......       
                                                         .....       ...  .........       
                                                         ....        .....     ....      
-                                                         ...         ....        ..   
+                                                        ...         ....        ..   
 
-                                                         N A T A K   -   Nucleus V1        
+                                                        N A T A K   -   Nucleus V1        
                                           
-                                                            Mesh Networking Radio          
+                                                          Mesh Networking Radio          
 
 
 V1.03 <br>
