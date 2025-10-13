@@ -28,9 +28,7 @@ The Nucleus V1 is a Raspberry Pi-based Mobile Ad-hoc Network (MANET) radio syste
 
 **Wireless Configuration:**
 - 802.11s mesh mode operation
-- Configurable channel selection (2.4GHz and 5GHz bands)
-- Mesh ID: "natak_mesh"
-- MTU: 1560 bytes to accommodate BATMAN-ADV overhead
+- Configurable channel selection (2.4GHz mesh)
 - WPA encryption for secure mesh communications
 
 ## Communication Protocols
