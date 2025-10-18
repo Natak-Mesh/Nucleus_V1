@@ -40,6 +40,22 @@ The analyzer shows:
 - **Recommendations**: Prioritizes non-overlapping channels (1, 6, 11)
 - **Best choice**: Lowest congestion channel for mesh deployment
 
+## Channel Score Calculation
+
+**Score = Network Count + Signal Strength + Adjacent Interference**
+
+1. **Network Count**: 10 points per detected access point
+2. **Signal Strength Penalty** (per network):
+   - Very strong (> -30 dBm): +20 points
+   - Strong (-30 to -50 dBm): +15 points
+   - Medium (-50 to -70 dBm): +10 points
+   - Weak (< -70 dBm): +5 points
+3. **Adjacent Channel Interference**:
+   - Networks on channels ±1: +5 points per network
+   - Networks on channels ±2: +3 points per network
+
+**Lower scores indicate better channels.** Empty channels score 0.
+
 ## Limitations
 
 **Only detects standard 802.11 access points.** Does not detect:
