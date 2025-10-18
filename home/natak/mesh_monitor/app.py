@@ -218,8 +218,10 @@ def run_channel_scan(duration):
         csv_file = os.path.join(scan_dir, 'scan_output-01.csv')
         
         # Remove old scan files
-        subprocess.run(['rm', '-f', os.path.join(scan_dir, 'scan_output*.csv')], 
-                      capture_output=True)
+        import glob
+        old_files = glob.glob(os.path.join(scan_dir, 'scan_output*.csv'))
+        if old_files:
+            subprocess.run(['rm', '-f'] + old_files, capture_output=True)
         
         # Stop mesh services
         subprocess.run(['sudo', 'systemctl', 'stop', 'mesh-startup.service'], 
