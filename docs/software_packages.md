@@ -76,8 +76,9 @@ sudo systemctl enable NetworkManager
 ## Additional Software
 
 ### Tailscale
+```bash
 curl -fsSL https://tailscale.com/install.sh | sh
-
+```
 ### TAKserver
 
 Download and install TAKserver arm64 .deb from [tak.gov](https://tak.gov)
