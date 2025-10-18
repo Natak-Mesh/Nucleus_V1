@@ -431,6 +431,198 @@
             });
         }
         
+        // Channel scanning functions
+        let scanStatusInterval = null;
+        
+        function startChannelScan() {
+            const duration = parseInt(document.getElementById('scan-duration').value);
+            const button = document.getElementById('start-scan');
+            
+            // Disable button
+            button.disabled = true;
+            button.textContent = 'Starting...';
+            
+            // Hide results, show status
+            document.getElementById('scan-results').style.display = 'none';
+            document.getElementById('scan-error').style.display = 'none';
+            document.getElementById('scan-status').style.display = 'block';
+            
+            fetch('/api/channel-scan/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    duration: duration
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Start polling for status
+                    scanStatusInterval = setInterval(pollScanStatus, 1000);
+                } else {
+                    showStatus(data.error || 'Failed to start scan', 'error', 'scan-error');
+                    resetScanUI();
+                }
+            })
+            .catch(error => {
+                console.error('Failed to start scan:', error);
+                showStatus('Failed to start channel scan', 'error', 'scan-error');
+                resetScanUI();
+            });
+        }
+        
+        function pollScanStatus() {
+            fetch('/api/channel-scan/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusText = document.getElementById('scan-progress-text');
+                    const progressBar = document.getElementById('scan-progress-bar');
+                    
+                    if (data.status === 'running') {
+                        statusText.textContent = `Scanning... ${data.remaining} seconds remaining`;
+                        progressBar.style.width = `${data.progress}%`;
+                    } else if (data.status === 'complete') {
+                        statusText.textContent = 'Scan complete! Loading results...';
+                        progressBar.style.width = '100%';
+                        
+                        // Stop polling and load results
+                        clearInterval(scanStatusInterval);
+                        loadScanResults();
+                    } else if (data.status === 'error') {
+                        statusText.textContent = 'Scan failed';
+                        showStatus(data.error || 'Scan failed', 'error', 'scan-error');
+                        clearInterval(scanStatusInterval);
+                        resetScanUI();
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to get scan status:', error);
+                    clearInterval(scanStatusInterval);
+                    resetScanUI();
+                });
+        }
+        
+        function loadScanResults() {
+            fetch('/api/channel-scan/results')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.all_channels) {
+                        displayScanResults(data);
+                    } else {
+                        showStatus(data.error || 'No scan results available', 'error', 'scan-error');
+                    }
+                    resetScanUI();
+                })
+                .catch(error => {
+                    console.error('Failed to load scan results:', error);
+                    showStatus('Failed to load scan results', 'error', 'scan-error');
+                    resetScanUI();
+                });
+        }
+        
+        function displayScanResults(data) {
+            // Hide status, show results
+            document.getElementById('scan-status').style.display = 'none';
+            document.getElementById('scan-results').style.display = 'block';
+            
+            // Display recommended channels
+            const recDiv = document.getElementById('recommended-channels');
+            recDiv.innerHTML = '';
+            
+            if (data.best_channels && data.best_channels.length > 0) {
+                data.best_channels.slice(0, 3).forEach((channel, index) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; margin-bottom: 8px; background-color: var(--background-color); border-radius: 4px; border-left: 4px solid #4caf50;';
+                    
+                    const statusColor = channel.status === 'EMPTY' ? '#4caf50' : 
+                                       channel.status === 'EXCELLENT' ? '#4caf50' :
+                                       channel.status === 'GOOD' ? '#2196f3' :
+                                       channel.status === 'MODERATE' ? '#ff9800' : '#f44336';
+                    
+                    div.innerHTML = `
+                        <div>
+                            <strong>Channel ${channel.channel}</strong> 
+                            (${WIFI_CHANNELS[channel.channel]} MHz)
+                            <br>
+                            <small>${channel.network_count} networks, score ${channel.score.toFixed(0)} - 
+                            <span style="color: ${statusColor}">${channel.status}</span></small>
+                        </div>
+                        <button onclick="applyRecommendedChannel(${channel.channel})" 
+                                style="background-color: #4caf50; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+                            Apply
+                        </button>
+                    `;
+                    recDiv.appendChild(div);
+                });
+            } else {
+                recDiv.innerHTML = '<p>No recommendations available.</p>';
+            }
+            
+            // Display all channels table
+            const tbody = document.getElementById('channel-table-body');
+            tbody.innerHTML = '';
+            
+            data.all_channels.forEach(channel => {
+                const row = document.createElement('tr');
+                row.style.cssText = 'border-bottom: 1px solid #444;';
+                
+                // Create visual bar for congestion
+                const maxScore = Math.max(...data.all_channels.map(c => c.score));
+                const barWidth = maxScore > 0 ? (channel.score / maxScore) * 100 : 0;
+                const barColor = channel.status === 'EMPTY' ? '#4caf50' : 
+                                channel.status === 'EXCELLENT' ? '#4caf50' :
+                                channel.status === 'GOOD' ? '#2196f3' :
+                                channel.status === 'MODERATE' ? '#ff9800' : '#f44336';
+                
+                const statusColor = channel.status === 'EMPTY' ? '#4caf50' : 
+                                   channel.status === 'EXCELLENT' ? '#4caf50' :
+                                   channel.status === 'GOOD' ? '#2196f3' :
+                                   channel.status === 'MODERATE' ? '#ff9800' : '#f44336';
+                
+                row.innerHTML = `
+                    <td style="padding: 8px; border: 1px solid #444;">${channel.channel}</td>
+                    <td style="padding: 8px; border: 1px solid #444;">${channel.network_count}</td>
+                    <td style="padding: 8px; border: 1px solid #444;">${channel.score.toFixed(0)}</td>
+                    <td style="padding: 8px; border: 1px solid #444; color: ${statusColor}">${channel.status}</td>
+                    <td style="padding: 8px; border: 1px solid #444;">
+                        <div style="background-color: #333; border-radius: 2px; height: 16px; position: relative;">
+                            <div style="background-color: ${barColor}; height: 100%; width: ${barWidth}%; border-radius: 2px;"></div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function applyRecommendedChannel(channel) {
+            const currentChannel = parseInt(document.getElementById('current-channel').textContent);
+            
+            if (channel === currentChannel) {
+                showStatus('Channel is already set to ' + channel, 'error', 'scan-error');
+                return;
+            }
+            
+            if (confirm(`Apply recommended channel ${channel}?`)) {
+                // Set the channel selector
+                document.getElementById('channel-select').value = channel;
+                // Trigger channel change
+                changeChannel();
+            }
+        }
+        
+        function resetScanUI() {
+            const button = document.getElementById('start-scan');
+            button.disabled = false;
+            button.textContent = 'Start Channel Scan';
+            
+            // Hide status if no error
+            if (!document.getElementById('scan-error').textContent) {
+                document.getElementById('scan-status').style.display = 'none';
+            }
+        }
+        
         // Start when page loads
         document.addEventListener('DOMContentLoaded', function() {
             loadMeshConfig();
@@ -474,6 +666,52 @@
             </div>
             
             <div id="config-status" class="status-message"></div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Channel Analysis</h2>
+        <div class="config-controls">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                <label for="scan-duration">Scan Duration:</label>
+                <select id="scan-duration" style="background-color: var(--background-color); color: var(--text-color); border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                    <option value="30">30 seconds</option>
+                    <option value="60" selected>60 seconds</option>
+                    <option value="90">90 seconds</option>
+                </select>
+                <button id="start-scan" onclick="startChannelScan()" style="background-color: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Start Channel Scan</button>
+            </div>
+            
+            <div id="scan-status" style="display: none; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                <div id="scan-progress-text"></div>
+                <div style="background-color: #333; border-radius: 4px; margin-top: 8px;">
+                    <div id="scan-progress-bar" style="background-color: #2196f3; height: 8px; border-radius: 4px; width: 0%; transition: width 0.5s;"></div>
+                </div>
+            </div>
+            
+            <div id="scan-results" style="display: none;">
+                <h3>Channel Recommendations</h3>
+                <div id="recommended-channels" style="margin-bottom: 16px;"></div>
+                
+                <h3>All Channels</h3>
+                <div style="overflow-x: auto;">
+                    <table id="channel-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: var(--background-color);">
+                                <th style="padding: 8px; text-align: left; border: 1px solid #444;">Channel</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #444;">Networks</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #444;">Score</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #444;">Status</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #444;">Congestion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="channel-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="scan-error" class="status-message"></div>
         </div>
     </div>
     
