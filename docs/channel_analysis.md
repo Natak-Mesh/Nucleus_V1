@@ -1,7 +1,7 @@
 # WiFi Channel Analysis Implementation
 
 ## Overview
-Add channel analysis functionality to find the clearest WiFi channels for mesh operation. Temporarily disrupts mesh to scan both 2.4GHz and 5GHz bands.
+Add channel analysis functionality to find the clearest WiFi channels for mesh operation. Temporarily disrupts mesh to scan 2.4GHz band (hardware limited to 2.4GHz only).
 
 ## Required Package
 ```bash
@@ -19,8 +19,8 @@ pkill wpa_supplicant
 # Start monitor mode
 airmon-ng start wlan1
 
-# Scan both bands (2.4GHz + 5GHz)
-airodump-ng wlan1mon --band abg
+# Scan 2.4GHz band
+airodump-ng wlan1mon --band bg
 
 # Cleanup
 airmon-ng stop wlan1mon
@@ -29,13 +29,53 @@ systemctl start mesh-startup.service
 
 ### Automated Scan (60 seconds)
 ```bash
-timeout 60 airodump-ng wlan1mon --band abg --write /tmp/scan --output-format csv
+timeout 60 airodump-ng wlan1mon --band bg --write /tmp/scan --output-format csv
 ```
 
-### Band-Specific Options
-- `--band bg` - 2.4GHz only
-- `--band a` - 5GHz only  
-- `--band abg` - Both bands
+## Manual 2.4 GHz Channel Scan
+
+### Interactive Terminal Scan
+```bash
+# Set custom scan time (in seconds)
+SCAN_TIME=60
+
+# Stop mesh services
+sudo systemctl stop mesh-startup.service
+sudo pkill wpa_supplicant
+
+# Enable monitor mode
+sudo airmon-ng start wlan1
+
+# Run scan with custom duration (displays results in real-time)
+timeout $SCAN_TIME airodump-ng wlan1mon --band bg
+
+# Cleanup and restore mesh
+sudo airmon-ng stop wlan1mon
+sudo systemctl start mesh-startup.service
+```
+
+### One-liner with Custom Scan Time
+```bash
+# Replace 120 with desired scan time in seconds
+sudo systemctl stop mesh-startup.service && sudo pkill wpa_supplicant && sudo airmon-ng start wlan1 && timeout 120 airodump-ng wlan1mon --band bg && sudo airmon-ng stop wlan1mon && sudo systemctl start mesh-startup.service
+```
+
+### Save Scan Results to File
+```bash
+# Set scan duration and output file
+SCAN_TIME=60
+OUTPUT_FILE="/tmp/channel_scan_$(date +%Y%m%d_%H%M%S)"
+
+sudo systemctl stop mesh-startup.service
+sudo pkill wpa_supplicant
+sudo airmon-ng start wlan1
+timeout $SCAN_TIME airodump-ng wlan1mon --band bg --write $OUTPUT_FILE --output-format csv
+sudo airmon-ng stop wlan1mon
+sudo systemctl start mesh-startup.service
+
+# View results
+cat ${OUTPUT_FILE}-01.csv
+```
 
 ## Reading Results
 
@@ -54,7 +94,7 @@ timeout 60 airodump-ng wlan1mon --band abg --write /tmp/scan --output-format csv
 ## Web Integration Method
 
 ### Backend API Endpoint
-- `/api/channel-scan` - POST to start scan
+- `/api/channel-scan` - POST to start scan (2.4GHz only)
 - Returns JSON with channel data sorted by interference level
 - Handles mesh service stop/start automatically
 
