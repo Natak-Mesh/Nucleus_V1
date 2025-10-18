@@ -28,3 +28,4 @@ Aircrack-ng installed<br>
 MediaMTX installed and auto starting<br>
 iperf3 installed for throughput testing<br>
 ufw installed <br>
+Tailscale installed <br>
