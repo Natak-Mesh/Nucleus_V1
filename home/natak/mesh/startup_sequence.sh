@@ -46,3 +46,9 @@ sleep 5
 # Start media mtx. required for TAKserver video
 /home/natak/mediamtx &
 
+sleep 2
+
+# Reset RAK board to ensure BLE available for V1.1 hardware, requires reset pin on RAK board to be connected to GPIO 17
+gpioset gpiochip0 17=0; sleep 0.1; gpioset gpiochip0 17=1
+
+
