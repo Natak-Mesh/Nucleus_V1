@@ -1,4 +1,6 @@
-![Natak Mesh](NatakMeshsecondary-overlay@2x.png)
+<div style="text-align: center;">
+<img src="NatakMeshsecondary-overlay@2x.png" alt="Natak Mesh">
+</div>
 
 ## Contents
 
