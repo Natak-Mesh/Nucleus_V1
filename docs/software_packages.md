@@ -31,7 +31,7 @@ sudo apt update && sudo apt install -y hostapd batctl python3 python3-pip aircra
 
 ```bash
 # Install Reticulum (must start rns/rnsd at least once to generate config)
-pip3 install --break-system-packages rns
+pip3 install --break-system-packages rns lxmf
 ```
 
 ### Nomadnet
@@ -96,3 +96,7 @@ wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_li
 
 # Extract it
 tar -xvzf mediamtx_linux_arm64.tar.gz
+
+
+### Babel build
+sudo apt install babeld smcroute nftables tcpdump
