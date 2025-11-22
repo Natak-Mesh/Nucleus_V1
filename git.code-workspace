@@ -14,6 +14,9 @@
 		},
 		{
 			"path": "../../../etc/wpa_supplicant"
+		},
+		{
+			"path": "../../../etc/nucleus"
 		}
 	],
 	"settings": {}
