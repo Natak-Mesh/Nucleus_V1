@@ -37,6 +37,7 @@ Name=wlan1
 
 [Network]
 Address=${MESH_IP}/24
+ConfigureWithoutCarrier=yes
 EOF
 
 # Generate hostapd config
