@@ -20,8 +20,7 @@
 # Source configuration
 source /etc/nucleus/mesh.conf
 
-# Calculate frequency from channel (2.4GHz)
-MESH_FREQ=$((2407 + ($MESH_CHANNEL * 5)))
+sysctl -w net.ipv4.ip_forward=1
 
 # Set interfaces to not be managed by NetworkManager
 nmcli device set eth0 managed no
