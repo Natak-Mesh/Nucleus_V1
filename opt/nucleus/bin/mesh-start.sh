@@ -28,7 +28,6 @@ nmcli device set eth0 managed no
 nmcli device set wlan1 managed no
 nmcli device set wlan0 managed no
 nmcli device set br-lan managed no
-nmcli device set mesh0 managed no
 
 # Configure mesh interface
 ifconfig wlan1 down
