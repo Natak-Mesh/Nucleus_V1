@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../opt/nucleus"
+		},
+		{
+			"path": "../../../etc/systemd"
+		},
+		{
+			"path": "../../../etc/hostapd"
+		},
+		{
+			"path": "../../../etc/wpa_supplicant"
+		}
+	],
+	"settings": {}
+}
