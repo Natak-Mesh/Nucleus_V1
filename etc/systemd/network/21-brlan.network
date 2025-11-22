@@ -1,0 +1,6 @@
+[Match]
+Name=br-lan
+
+[Network]
+Address=192.168.50.1/24
+DHCPServer=yes

@@ -13,6 +13,7 @@ sudo cp -r "$SOURCE_DIR/etc/hostapd" /etc/
 sudo cp -r "$SOURCE_DIR/etc/wpa_supplicant" /etc/
 sudo mkdir -p /etc/nucleus
 sudo cp "$SOURCE_DIR/etc/nucleus/mesh.conf" /etc/nucleus/
+sudo cp -r "$SOURCE_DIR/etc/systemd/network" /etc/systemd/
 
 # Copy opt files
 sudo mkdir -p /opt/nucleus/bin
