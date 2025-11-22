@@ -2,4 +2,3 @@
 Name=eth0
 
 [Network]
-Bridge=br-lan

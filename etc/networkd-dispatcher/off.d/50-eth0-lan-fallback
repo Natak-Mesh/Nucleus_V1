@@ -1,0 +1,10 @@
+#!/bin/bash
+# Add eth0 back to br-lan when DHCP fails or cable unplugged
+
+if [ "$IFACE" = "eth0" ]; then
+    # Remove NAT rule if present
+    nft delete rule ip nat postrouting oifname "eth0" masquerade 2>/dev/null
+    
+    # Add eth0 back to bridge
+    ip link set eth0 master br-lan
+fi
