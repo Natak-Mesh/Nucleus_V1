@@ -25,7 +25,14 @@ Subnets
 - WAN (eth0 plugged into home router): DHCP from router
 
 Required Packages
-sudo apt install babeld smcroute hostapd nftables tcpdump
+sudo apt install babeld smcroute hostapd nftables tcpdump networkd-dispatcher
+
+Service Configuration
+Disable auto-start for services managed by mesh-start.sh:
+sudo systemctl disable hostapd
+sudo systemctl mask wpa_supplicant@.service
+
+These services will be started manually by the mesh setup script after configs are generated.
 
 systemd-networkd Configuration
 
@@ -146,3 +153,34 @@ Summary
 - smcroute forwards only needed multicast
 - No bridging of mesh0
 - No static routes needed for users
+
+Filesystem Structure
+
+```
+/etc/nucleus/                  # Config files
+  ├── mesh.conf               # Mesh settings
+  └── web.conf                # Flask settings
+
+/opt/nucleus/                  # Application root
+  ├── bin/                     # Executable scripts
+  │   └── mesh-setup          # Mesh establishment
+  └── web/                     # Flask app (no venv)
+      ├── app.py
+      ├── static/
+      └── templates/
+
+/etc/systemd/system/           # Service files
+  ├── mesh-setup.service
+  └── nucleus-web.service
+
+/etc/networkd-dispatcher/      # eth0 switching scripts
+  ├── routable.d/
+  │   └── 50-eth0-wan-switch
+  └── off.d/
+      └── 50-eth0-lan-fallback
+```
+
+**Notes:**
+- No venv required (packages installed with --break-system-packages)
+- Flask service uses: `ExecStart=/usr/bin/python3 /opt/nucleus/web/app.py`
+- All Nucleus components under /opt/nucleus/ for easy management
