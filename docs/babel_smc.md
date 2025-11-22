@@ -6,40 +6,108 @@ Why Switch
 - BATMAN-adv = constant L2 flooding (OGMs, ARP, DHCP, mDNS, SSDP).
 - Babel = unicast neighbor updates → far lower load.
 - No giant L2 broadcast domain.
-- mesh0 becomes a clean routed interface.
+- wlan1 becomes a clean routed interface.
 - wlan0/eth0 clients can access the mesh without static routes.
 - AP clients and OTG phone connections work automatically.
 
 Final Network Architecture
 
 Interfaces
-- mesh0 → 802.11s mesh, static IP, Babel routing
+- wlan1 → 802.11s mesh, static IP, Babel routing
 - br-lan → LAN bridge (wlan0 + optionally eth0)
 - wlan0 → AP
 - eth0 → automatic WAN/LAN (DHCP or fallback static)
 
 Subnets
-- mesh0: 10.0.0.x/24 (static per node)
+- wlan1: 10.0.0.x/24 (static per node)
 - br-lan: 192.168.50.1/24
 - LAN clients: served via networkd DHCP server
 - WAN (eth0 plugged into home router): DHCP from router
 
 Required Packages
-sudo apt install babeld smcroute hostapd nftables tcpdump networkd-dispatcher
+sudo apt install babeld smcroute hostapd nftables tcpdump
 
-Service Configuration
-Disable auto-start for services managed by mesh-start.sh:
-sudo systemctl disable hostapd
+## Current State of the Build
+
+### Service Configuration
+
+1. **Enable systemd-networkd:**
+```bash
+sudo systemctl enable systemd-networkd
+sudo systemctl start systemd-networkd
+```
+
+2. **Configure hostapd:**
+```bash
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd
+# Note: hostapd will be started by mesh-start.sh after config generation
+```
+
+3. **Disable wpa_supplicant (started by script):**
+```bash
+sudo systemctl disable wpa_supplicant
 sudo systemctl mask wpa_supplicant@.service
+# Note: wpa_supplicant will be started by mesh-start.sh for mesh encryption
+```
 
-These services will be started manually by the mesh setup script after configs are generated.
+### Deployment Workflow
+
+All development work is done in `~/git` directory and deployed to the system:
+
+1. **Work in git repository:**
+   ```bash
+   cd ~/git
+   # Edit files as needed
+   ```
+
+2. **Deploy files to system:**
+   ```bash
+   ./deploy.sh
+   # Copies files from ~/git to their proper system locations
+   ```
+
+3. **Edit mesh configuration:**
+   ```bash
+   sudo nano /etc/nucleus/mesh.conf
+   # Configure MESH_NAME, MESH_CHANNEL, MESH_IP, etc.
+   ```
+
+4. **Generate config files:**
+   ```bash
+   sudo /opt/nucleus/bin/config_generation.sh
+   # Generates: 10-wlan1.network, hostapd.conf, wpa_supplicant-wlan1-encrypt.conf
+   ```
+
+5. **Start the mesh:**
+   ```bash
+   sudo /opt/nucleus/bin/mesh-start.sh
+   # Configures interfaces, starts wpa_supplicant and hostapd
+   ```
+
+**Key Points:**
+- Scripts are in `/opt/nucleus/bin/`
+- Configuration master file: `/etc/nucleus/mesh.conf`
+- Generated configs: `/etc/systemd/network/10-wlan1.network`, `/etc/hostapd/hostapd.conf`, `/etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.conf`
+- Keep `deploy.sh` updated when adding new files to the git repository
+- Flow: Edit in `~/git` → Run `deploy.sh` → Edit `mesh.conf` → Run `config_generation.sh` → Run `mesh-start.sh`
+
+### To Do
+
+**Current Status:** mesh-start.sh creates a functioning 802.11s mesh network
+
+**Remaining Tasks:**
+1. Review and possibly adjust the `mesh_fwding` parameter in mesh-start.sh/wpa_supplicant configuration
+2. Implement babeld configuration and integration
+3. Implement smcroute configuration for multicast forwarding
+4. Test end-to-end routing between mesh nodes
 
 systemd-networkd Configuration
 
-1. mesh0 – Static Mesh IP
-/etc/systemd/network/10-mesh0.network:
+1. wlan1 – Static Mesh IP
+/etc/systemd/network/10-wlan1.network:
 [Match]
-Name=mesh0
+Name=wlan1
 [Network]
 Address=10.0.0.2/24
 
@@ -66,9 +134,7 @@ Name=wlan0
 [Network]
 Bridge=br-lan
 
-4. eth0 – Dual Mode Operation (Option A: Script-Based)
-
-**Default State:** eth0 starts in br-lan (LAN mode, DHCP server)
+4. eth0 – LAN Bridge
 
 /etc/systemd/network/40-eth0-lan.network:
 [Match]
@@ -76,41 +142,12 @@ Name=eth0
 [Network]
 Bridge=br-lan
 
-**Switching Logic via networkd-dispatcher:**
-
-/etc/networkd-dispatcher/routable.d/50-eth0-wan-switch:
-```bash
-#!/bin/bash
-if [ "$IFACE" = "eth0" ] && [ "$AdministrativeState" = "routable" ]; then
-    # DHCP succeeded - switch to WAN mode
-    ip link set eth0 nomaster  # Remove from bridge
-    nft add rule ip nat postrouting oifname "eth0" masquerade
-fi
-```
-
-/etc/networkd-dispatcher/off.d/50-eth0-lan-fallback:
-```bash
-#!/bin/bash
-if [ "$IFACE" = "eth0" ]; then
-    # Connection lost - return to LAN mode
-    nft delete rule ip nat postrouting oifname "eth0" masquerade 2>/dev/null
-    ip link set eth0 master br-lan
-fi
-```
-
-**Requires:** `apt install networkd-dispatcher`
-
-**Behavior:**
-- Boot: eth0 in br-lan, serves DHCP to clients
-- Cable plugged + DHCP → eth0 becomes WAN with NAT
-- Cable unplugged → eth0 returns to br-lan
-
-**Note:** This adds complexity. For simpler deployments, dedicate eth0 to either WAN or LAN role only.
+**Note:** eth0 mode switching is handled by eth0-mode.sh script
 
 Babeld Setup
 
 /etc/babeld.conf:
-interface mesh0
+interface wlan1
 interface br-lan
 redistribute ip
 redistribute local
@@ -121,10 +158,10 @@ sudo systemctl enable --now babeld
 smcroute Setup (example ATAK CoT group 239.2.3.1)
 
 /etc/smcroute.conf:
-mgroup from mesh0 group 239.2.3.1
+mgroup from wlan1 group 239.2.3.1
 mgroup from br-lan group 239.2.3.1
-mroute from mesh0 group 239.2.3.1 to mesh0 br-lan
-mroute from br-lan group 239.2.3.1 to mesh0
+mroute from wlan1 group 239.2.3.1 to wlan1 br-lan
+mroute from br-lan group 239.2.3.1 to wlan1
 
 Enable smcroute:
 sudo systemctl enable --now smcroute
@@ -141,17 +178,17 @@ table ip nat {
 tcpdump Verification
 
 Multicast forwarding test:
-tcpdump -n -i mesh0 host 239.2.3.1
+tcpdump -n -i wlan1 host 239.2.3.1
 
 Babel traffic test:
-tcpdump -n -i mesh0 port 6696
+tcpdump -n -i wlan1 port 6696
 
 Summary
-- mesh0 = static IP, routed by Babel
+- wlan1 = static IP, routed by Babel
 - br-lan = AP + LAN clients (DHCP via systemd-networkd)
 - eth0 = WAN if DHCP works, LAN if fallback static
 - smcroute forwards only needed multicast
-- No bridging of mesh0
+- No bridging of wlan1
 - No static routes needed for users
 
 Filesystem Structure
@@ -163,21 +200,29 @@ Filesystem Structure
 
 /opt/nucleus/                  # Application root
   ├── bin/                     # Executable scripts
-  │   └── mesh-setup          # Mesh establishment
+  │   ├── config_generation.sh  # Generate config files
+  │   ├── eth0-mode.sh         # eth0 mode switching
+  │   └── mesh-start.sh        # Mesh establishment
   └── web/                     # Flask app (no venv)
       ├── app.py
       ├── static/
       └── templates/
 
+/etc/hostapd/                  # hostapd configs
+  └── hostapd.conf            # Generated by config_generation.sh
+
+/etc/systemd/network/          # systemd-networkd configs
+  ├── 10-wlan1.network        # Generated by config_generation.sh
+  ├── 20-brlan.netdev
+  ├── 21-brlan.network
+  ├── 30-wlan0.network
+  └── 40-eth0-lan.network
+
 /etc/systemd/system/           # Service files
-  ├── mesh-setup.service
   └── nucleus-web.service
 
-/etc/networkd-dispatcher/      # eth0 switching scripts
-  ├── routable.d/
-  │   └── 50-eth0-wan-switch
-  └── off.d/
-      └── 50-eth0-lan-fallback
+/etc/wpa_supplicant/           # WPA supplicant configs
+  └── wpa_supplicant-wlan1-encrypt.conf  # Generated by config_generation.sh
 ```
 
 **Notes:**
