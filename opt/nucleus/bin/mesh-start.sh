@@ -44,7 +44,12 @@ wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.c
 # Wait for encryption to be established
 sleep 15
 
-systemctl restart systemd-networkd
+networkctl reconfigure wlan1
+
+# Restore DNS configuration
+sleep 2
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+echo "nameserver 8.8.4.4" >> /etc/resolv.conf
 
 # Start hostapd
 systemctl start hostapd

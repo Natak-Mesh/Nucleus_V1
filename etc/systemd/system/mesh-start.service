@@ -1,0 +1,12 @@
+[Unit]
+Description=Mesh Network Initialization
+After=network.target systemd-networkd.service
+Before=hostapd.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/nucleus/bin/mesh-start.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
