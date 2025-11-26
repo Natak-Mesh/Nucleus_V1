@@ -14,6 +14,13 @@ sudo cp -r "$SOURCE_DIR/etc/wpa_supplicant" /etc/
 sudo mkdir -p /etc/nucleus
 sudo cp "$SOURCE_DIR/etc/nucleus/mesh.conf" /etc/nucleus/
 sudo cp -r "$SOURCE_DIR/etc/systemd/network" /etc/systemd/
+sudo mkdir -p /etc/NetworkManager/conf.d
+sudo cp "$SOURCE_DIR/etc/NetworkManager/conf.d/unmanaged-devices.conf" /etc/NetworkManager/conf.d/
+
+# Copy systemd service files
+sudo cp "$SOURCE_DIR/etc/systemd/system/brlan-setup.service" /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable brlan-setup.service
 
 # Copy opt files
 sudo mkdir -p /opt/nucleus/bin

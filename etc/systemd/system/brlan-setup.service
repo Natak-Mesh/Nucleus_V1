@@ -1,0 +1,15 @@
+[Unit]
+Description=Add wlan0 to br-lan bridge after hostapd
+After=hostapd.service systemd-networkd.service
+Wants=hostapd.service
+Requires=systemd-networkd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sleep 2
+ExecStart=/usr/bin/ip link set wlan0 master br-lan
+ExecStart=/usr/bin/networkctl reconfigure br-lan
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
