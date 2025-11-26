@@ -44,7 +44,8 @@ wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1-encrypt.c
 # Wait for encryption to be established
 sleep 15
 
-networkctl reconfigure wlan1
+# Apply IP address manually (systemd-networkd would reset mesh mode)
+ip addr add $MESH_IP/24 dev wlan1
 
 # Restore DNS configuration
 sleep 2
