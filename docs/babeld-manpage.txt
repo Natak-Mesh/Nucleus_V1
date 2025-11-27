@@ -1,0 +1,481 @@
+NAME
+       babeld - ad-hoc network routing daemon
+
+SYNOPSIS
+       babeld option...  [ -- ] interface...
+
+DESCRIPTION
+       Babel  is  a  loop-avoiding  distance-vector  routing  protocol  roughly based on DSDV and AODV, but with
+       provisions for link cost estimation and redistribution of routes from other routing protocols.
+
+       While it is optimised for wireless mesh networks, Babel will also work efficiently on wired networks.
+
+OPTIONS
+       -V     Display babeld's version and quit.
+
+       -m multicast-address
+              Specify  the  link-local  multicast  address  to  be  used  by  the  protocol.   The  default   is
+              ff02:0:0:0:0:0:1:6.
+
+       -p port
+              Specify the UDP port number to be used by the protocol.  The default is 6696.
+
+       -S state-file
+              Set  the  name  of  the  file used for preserving long-term information between invocations of the
+              babeld daemon.  If this file is deleted, the daemon will run in passive mode for 3 minutes when it
+              is next started, and other hosts might initially ignore it. The default is /var/lib/babel-state.
+
+       -h hello-interval
+              Specify the interval in seconds at which scheduled hello packets are sent on wireless  interfaces.
+              The default is 4 seconds.
+
+       -H wired-hello-interval
+              Specify  the  interval  in  seconds at which scheduled hello packets are sent on wired interfaces.
+              The default is 4 seconds.
+
+       -z kind [,factor]
+              Enable diversity-sensitive routing.  The value kind defines the diversity algorithm used, and  can
+              be  one  of 0 (no diversity), 1 (per-interface diversity with no memory), 2 (per-channel diversity
+              with no memory), or 3 (per-channel diversity with memory).  The value factor specifies by how much
+              the cost of non-interfering routes is multiplied, in units of 1/256;  the  default  is  128  (i.e.
+              division by 2).
+
+       -M half-time
+              Specify  the  half-time  in  seconds  of  the  exponential  decay  used  for smoothing metrics for
+              performing route selection; the value 0 disables smoothing.  The default is 4s.
+
+       -k priority
+              Specify the priority value used when installing routes into the kernel.  The default is 0.
+
+       -A priority
+              Allow duplicating external routes when their kernel priority is at least  priority.   Do  not  use
+              this option unless you know what you are doing, as it can cause persistent route flapping.
+
+       -l     Use IFF_RUNNING (carrier sense) when determining interface availability.
+
+       -w     Don't optimise wired links, assume all interfaces are wireless unless explicitly overridden in the
+              configuration file.
+
+       -s     Do  not  perform  split-horizon processing on wired interfaces.  Split-horizon is not performed on
+              wireless interfaces.
+
+       -r     Use a random router-id.  The default is to use persistent router-ids derived from the MAC  address
+              of  the first interface, which is easier to debug and more reliably prevents routing loops but may
+              sometimes cause a node to be unreachable for 120 seconds just after boot.
+
+       -u     Do not flush unfeasible (useless) routes.  This is useful in order to announce more information to
+              a front-end (see -g).
+
+       -d level
+              Debug level.  A value of 1 requests a routing table dump at every iteration through  the  daemon's
+              main loop.  A value of 2 additionally requests tracing every message sent or received.  A value of
+              3 additionally dumps all interactions with the OS kernel.  The default is 0.
+
+       -g port, -g path
+              Set  up  a  local configuration server on port port or at path in read-only mode.  The protocol is
+              described in the section Local Configuration Protocol below.
+
+       -G port, -G path
+              Set up a local configuration server on port port or at path in read-write mode.  This  allows  any
+              local user to change babeld's configuration, and may therefore be a security issue.
+
+       -t table
+              Use the given kernel routing table for routes inserted by babeld.
+
+       -T table
+              Export  routes  from the given kernel routing table. This can be specified multiple times in order
+              to export routes from more than one table.
+
+       -c filename
+              Specify the name of the configuration file.  This  flag  can  be  repeated  multiple  times.   The
+              default is /etc/babeld.conf.
+
+       -C statement
+              Specify a configuration statement directly on the command line.
+
+       -D     Daemonise at startup.
+
+       -L logfile
+              Specify  a  file to log random ``how do you do?'' messages to.  This defaults to standard error if
+              not daemonising, and to /var/log/babeld.log otherwise.
+
+       -I pidfile
+              Specify a file to write our process id to, use no pidfile if set to the empty string.  The default
+              is /var/run/babeld.pid.
+
+       interface...
+              The list of interfaces on which the protocol should operate.
+
+CONFIGURATION FILE FORMAT
+       The configuration file is a sequence of lines each of which  specifies  a  global  option,  an  interface
+       specification  or  a  filtering rule.  Comments are introduced by an octothorp ``#'' and terminate at the
+       end of the line.
+
+   Global options
+       protocol-group group
+              This specifies the link-local multicast address to be used by the protocol, and is  equivalent  to
+              the command-line option -m.
+
+       protocol-port port
+              This  specifies  the UDP port number to be used by the protocol, and is equivalent to the command-
+              line option -p.
+
+       kernel-priority priority
+              This specifies the priority value used when installing routes into the kernel, and  is  equivalent
+              to the command-line option -k.
+
+       reflect-kernel-metric {true|false}
+              Reflect  route  metrics  as kernel priorities.  The priority effectively used is kernel-priority +
+              metric.
+
+       allow-duplicates priority
+              This allows duplicating external routes when their kernel priority is at least priority.   Do  not
+              use this option unless you know what you are doing, as it can cause persistent route flapping.
+
+       random-id {true|false}
+              This specifies whether to use a random router-id, and is equivalent to the command-line option -r.
+
+       ipv6-subtrees {true|false}
+              This  specifies whether to use native source-specific IPv6 forwarding rather than multiple routing
+              tables.  The default is chosen automatically depending on the kernel version.
+
+       debug level
+              This specifies the debugging level, and is equivalent to the command-line option -d.
+
+       local-port port
+              This specifies the TCP port on which babeld will  listen  for  connections  from  a  configuration
+              client in read-only mode, and is equivalent to the command-line option -g.
+
+       local-port-readwrite port
+              This  specifies  the  TCP  port  on  which babeld will listen for connections from a configuration
+              client in read-write mode, and is equivalent to the command-line option -G.  This allows any local
+              user to change babeld's configuration, and may therefore be a security issue.
+
+       local-path path
+              This specifies the filesystem path to a socket on which babeld will listen for connections from  a
+              configuration client in read-only mode, and is equivalent to the command-line option -g.
+
+       local-path-readwrite path
+              This  specifies the filesystem path to a socket on which babeld will listen for connections from a
+              configuration client in read-write mode, and is equivalent to the  command-line  option  -G.   Any
+              user with write access to that socket will be able to change babeld's configuration.
+
+       export-table table
+              This specifies the kernel routing table to use for routes inserted by babeld, and is equivalent to
+              the command-line option -t.
+
+       import-table table
+              This  specifies  a  kernel routing table from which routes are redistributed by babeld, and can be
+              specified multiple times with a cumulative effect.  This is equivalent to the command-line  option
+              -T.
+
+       link-detect {true|false}
+              This  specifies  whether  to  use  carrier  sense  for  determining interface availability, and is
+              equivalent to the command-line option -l.
+
+       diversity {true|false|kind}
+              This specifies the diversity algorithm to use; true is equivalent to kind 3.  The default is false
+              (do not use any diversity algorithm).
+
+       diversity-factor factor
+              This specifies by how much the cost of non-interfering routes should be multiplied,  in  units  of
+              1/256.  The default is 128 (division by 2).
+
+       smoothing-half-life seconds
+              This  specifies  the  half-life in seconds of the exponential decay used for smoothing metrics for
+              performing route selection, and is equivalent to the command-line option -M.
+
+       daemonise {true|false}
+              This specifies whether to daemonize at startup, and is equivalent to the command-line option -D.
+
+       skip-kernel-setup {true|false}
+              If this flag is set, no kernel (sysctl) setup is performed on startup. This  can  be  useful  when
+              running  in  environments where system permissions prevent setting kernel parameters, for instance
+              inside a Linux container.
+
+       router-id id
+              Specify the router-id explicitly, as a modified EUI-64 or a MAC-48 address.  If two nodes have the
+              same router-id, bad things will happen.  Don't use this option unless you know what you are doing.
+
+       state-file filename
+              This specifies the name of the file used for preserving long-term information between  invocations
+              of the babeld daemon, and is equivalent to the command-line option -S.
+
+       log-file filename
+              This  specifies  the  name  of  the  file used to log random messages to, and is equivalent to the
+              command-line option -L.
+
+       pid-file filename
+              This specifies the name of the file to which babeld writes out its process id, and  is  equivalent
+              to the command-line option -I.
+
+       first-table-number table
+              This  specifies  the  index  of  the  first  routing table to use for source-specific routes.  The
+              default is 10.
+
+       first-rule-priority priority
+              This specifies smallest (highest) rule priority used with source-specific routes.  The default  is
+              100.
+
+   Interface configuration
+       An interface is configured by a line with the following format:
+
+              interface name [parameter...]
+
+       where  name  is  the  name  of  the  interface  (something like eth0).  The default value of an interface
+       parameter can be specified changed by a line of the form
+
+              default [parameter...]
+
+       Each parameter can be one of:
+
+       type {auto|wired|wireless|tunnel}
+
+              The default is auto unless the -w command-line flag was specified.
+
+       link-quality {true|false|auto}
+              This specifies whether link quality estimation should be performed on this interface.  The default
+              is to perform link quality estimation on wireless interfaces only.
+
+       split-horizon {true|false|auto}
+              This specifies whether to perform split-horizon processing on this interface.  The default  is  to
+              perform split-horizon processing on on wired interfaces, unless the -s flag was set.
+
+       rxcost cost
+              This defines the cost of receiving frames on the given interface under ideal conditions (no packet
+              loss); how this relates to the actual cost used for computing metrics of routes going through this
+              interface  depends  on  whether  link quality estimation is being done.  The default is 256 if the
+              interface is wireless, and 96 otherwise.
+
+       channel channel
+              Sets the channel for this interface.  The value channel can be either an integer, or  one  of  the
+              strings  interfering  or  noninterfering.   The  default  is  to autodetect the channel number for
+              wireless interfaces, and noninterfering for other interfaces.
+
+       faraway {true|false}
+              This specifies whether the network is "far away", in the  sense  that  networks  behind  it  don't
+              interfere with networks in front of it.  By default, networks are not far away.
+
+       hello-interval interval
+              This  defines the interval between hello packets sent on this interface.  The default is specified
+              with the -h and -H command-line flags.
+
+       update-interval interval
+              This defines the interval between full routing table dumps sent on  this  interface;  since  Babel
+              uses  triggered  updates  and  doesn't count to infinity, this can be set to a fairly large value,
+              unless significant packet loss is expected.  The default is four times the hello interval.
+
+       enable-timestamps {true|false}
+              Enable sending timestamps with each Hello and IHU message in order to  compute  RTT  values.   The
+              default is true for tunnel interfaces, and false otherwise.
+
+       unicast {true|false}
+              Send  multiple  copies  of  TLVs  other than Hellos to all neighbours rather than sending a single
+              multicast packet.  The default is false.
+
+       rfc6126-compatible {true|false}
+              Disable some features that are incompatible  with  RFC  6126  (the  older  version  of  the  Babel
+              protocol), such as source-specific routing and RTT estimation over unicast.  The default is false.
+
+       rtt-decay decay
+              This  specifies  the  decay  factor for the exponential moving average of RTT samples, in units of
+              1/256.  Must be between 1 and 256, inclusive.  Higher values  discard  old  samples  faster.   The
+              default is 42.
+
+       rtt-min rtt
+              This  specifies  the  minimum  RTT, in milliseconds, starting from which we increase the cost to a
+              neighbour. The additional cost is linear in (rtt - rtt-min).  The default is 10 ms.
+
+       rtt-max rtt
+              This specifies the maximum RTT, in milliseconds, above which we  don't  increase  the  cost  to  a
+              neighbour. The default is 120 ms.
+
+       max-rtt-penalty cost
+              This  specifies  the maximum cost added to a neighbour because of RTT, i.e. when the RTT is higher
+              or equal than rtt-max.  The default is 96 if the interface is of type tunnel, and 0 otherwise.
+
+   Filtering rules
+       A filtering rule is defined by a single line with the following format:
+
+              filter selector...  action
+
+       Filter specifies the filter to which this entry will be added, and can be one of in  (applied  to  routes
+       learned  from  Babel  neighbours),  out  (applied  to routes announced to Babel neighbours), redistribute
+       (applied to routes redistributed from the kernel), or install  (applied  to  routes  installed  into  the
+       kernel).
+
+       Each selector specifies the conditions under which the given statement matches.  It can be one of
+
+       ip prefix
+              This entry only applies to routes in the given prefix.
+
+       eq plen
+              This entry only applies to routes with a prefix length equal to plen.
+
+       le plen
+              This entry only applies to routes with a prefix length less or equal to plen.
+
+       ge plen
+              This entry only applies to routes with a prefix length greater or equal to plen.
+
+       src-ip prefix
+              This entry only applies to routes with a source prefix in the given prefix.
+
+       src-eq plen
+              This entry only applies to routes with a source prefix length equal to plen.
+
+       src-le plen
+              This entry only applies to routes with a source prefix length less or equal to plen.
+
+       src-ge plen
+              This entry only applies to routes with a source prefix length greater or equal to plen.
+
+       neigh address
+              This entry only applies to routes learned from a neighbour with link-local address address.
+
+       id id  This entry only applies to routes originated by a router with router-id id.
+
+       proto p
+              This  entry  only  applies  to  kernel routes with kernel protocol number p.  If neither proto nor
+              local is specified, this entry applies to all non-local kernel routes with  a  protocol  different
+              from "boot".
+
+       local  This entry only applies to local addresses.
+
+       if interface
+              For  an input filter, this specifies the interface over which the route is learned.  For an output
+              filter, this specifies the interface over which this route  is  advertised.   For  a  redistribute
+              statement, this specifies the interface over which the route forwards packets.
+
+       Action  specifies  the  action  to  be  taken  when this entry matches.  It can have one of the following
+       values:
+
+       allow  Allow this route, without changing  its  metric  (or  setting  its  metric  to  0  in  case  of  a
+              redistribute filter).
+
+       deny   Ignore this route.
+
+       metric value
+              For  an  input  or  output  filter,  allow this route after increasing its metric by value.  For a
+              redistribute filter, redistribute this route with metric value.
+
+       src-prefix prefix
+              For a redistribute filter, set the source prefix of this route to prefix.
+
+       table table
+              In an install filter, specify the kernel routing table to use.  For source-specific  routes,  this
+              only works reliably for IPv6, and only when ipv6-subtrees is true.
+
+       pref-src ip
+              Specify the preferred source address to use with this route.  Only useful in an install filter.
+
+       If action is not specified, it defaults to allow.
+
+       By  default,  babeld  redistributes all local addresses, and no other routes.  In order to make sure that
+       only the routes you specify are redistributed, you should include the line
+
+              redistribute local deny
+
+       as the last line in your configuration file.
+
+LOCAL CONFIGURATION INTERFACE
+       If babeld is invoked with the flag -g, it accepts TCP connections from local clients on  the  given  port
+       and  address  ::1  (the  IPv6 localhost address), or on the given UNIX-domain socket path if the argument
+       starts with ‘/’.  When a client connects, babeld replies with BABEL followed with the  supported  version
+       of  the  local  configuration  protocol (currently 1.0).  This is followed with a number of informational
+       lines (version etc.), terminated by ok.  The client can then  send  requests,  one  per  line.   To  each
+       request, babeld replies with one or more lines of data terminated by one of ok, no, or bad.
+
+       The following requests are currently defined:
+
+       • any configuration file directive, including interface;
+
+       • flush interface;
+
+       • dump;
+
+       • monitor and unmonitor;
+
+       • quit.
+
+EXAMPLES
+       You can participate in a Babel network by simply running
+
+              # babeld wlan0
+
+       where wlan0 is the name of your wireless interface.
+
+       In order to gateway between multiple interfaces, just list them all on the command line:
+
+              # babeld wlan0 eth0 sit1
+
+       On an access point, you'll probably want to redistribute some external routes into Babel:
+
+              # babeld \
+                  -C 'redistribute metric 256' \
+                  wlan0
+
+       or, if you want to constrain the routes that you redistribute,
+
+              # babeld \
+                  -C 'redistribute proto 11 ip ::/0 le 64 metric 256' \
+                  -C 'redistribute proto 11 ip 0.0.0.0/0 le 24 metric 256' \
+                  wlan0
+
+   Source-specific routing
+       If  your want to redistribute kernel routes as source-specific to the network, with the 2001:DB8:0:1::/64
+       prefix:
+
+              redistribute src-prefix 2001:DB8:0:1::/64
+
+       For more information about source-specific routing, please see
+
+              Matthieu Boutier and Juliusz Chroboczek.  Source-sensitive  routing.   In  Proc.  IFIP  Networking
+              2015.  2015.
+
+       available online at
+
+              http://arxiv.org/pdf/1403.0445v4.pdf
+
+FILES
+       /etc/babeld.conf
+              The default location of the configuration file.
+
+       /var/lib/babel-state
+              The default location of the file storing long-term state.
+
+       /var/run/babeld.pid
+              The default location of the pid file.
+
+       /var/log/babeld.log
+              The default location of the log file.
+
+SIGNALS
+       SIGUSR1
+              Dump Babel's routing tables to standard output or to the log file.
+
+       SIGUSR2
+              Check interfaces and kernel routes right now, then reopen the log file.
+
+SECURITY
+       Babel  is a completely insecure protocol: any attacker able to inject IP packets with a link-local source
+       address can disrupt the protocol's operation.  This is no different from unsecured neighbour discovery or
+       ARP.
+
+       Usage of the -G flag allows any user logged on the local host to change babeld's configuration.
+
+       Since Babel uses link-local IPv6 packets only, there is no need to update firewalls to  allow  forwarding
+       of  Babel  protocol  packets.   If  local  filtering is being done, UDP datagrams to the port used by the
+       protocol should be allowed.  As Babel uses unicast packets in some cases, it is not enough to just  allow
+       packets destined to Babel's multicast address.
+
+SEE ALSO
+       routed(8), route6d(8), zebra(8), ahcpd(8).
+
+AUTHOR
+       Juliusz Chroboczek.
+
+                                                                                                       BABELD(8)
+Powered by the Ubuntu Manpage Operator, file bugs in GitHub
+
+© 2025 Canonical. Ubuntu and Canonical are registered trademarks of Canonical Ltd.
