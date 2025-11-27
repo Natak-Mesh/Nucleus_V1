@@ -21,6 +21,8 @@ sudo cp "$SOURCE_DIR/etc/smcroute.conf" /etc/
 
 # Copy systemd service files
 sudo cp "$SOURCE_DIR/etc/systemd/system/brlan-setup.service" /etc/systemd/system/
+sudo mkdir -p /etc/systemd/system/babeld.service.d
+sudo cp "$SOURCE_DIR/etc/systemd/system/babeld.service.d/override.conf" /etc/systemd/system/babeld.service.d/
 sudo systemctl daemon-reload
 sudo systemctl enable brlan-setup.service
 

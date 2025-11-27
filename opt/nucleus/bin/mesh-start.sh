@@ -46,6 +46,7 @@ sleep 15
 
 # Apply IP address manually (systemd-networkd would reset mesh mode)
 ip addr add $MESH_IP/24 dev wlan1
+ip -6 addr add $MESH_IPV6_LL/64 dev wlan1
 
 # Restore DNS configuration
 sleep 2
