@@ -1,0 +1,39 @@
+# Babeld Configuration Fix for Remote Node
+
+## Problem
+Remote node only advertises /32 host IPs instead of /24 subnets, preventing routing to EUDs.
+
+## Solution on Remote Node (10.20.1.12)
+
+### 1. Update babeld.conf
+```bash
+cd ~/git
+git pull
+sudo cp etc/babeld.conf /etc/babeld.conf
+```
+
+### 2. Restart babeld
+```bash
+sudo systemctl restart babeld
+```
+
+### 3. Verify configuration loaded
+```bash
+sudo systemctl status babeld | grep "10.20"
+```
+Should show:
+- 10.20.1.0/24 from 0.0.0.0/0 metric 0 (exported)
+- 10.20.2.0/24 from 0.0.0.0/0 metric 0 (exported)
+
+### 4. Test from node 10.20.1.11
+```bash
+ping 10.20.2.58
+```
+Should now work.
+
+## Key Config Change
+Rule order in /etc/babeld.conf:
+1. redistribute ip 10.20.1.0/24 allow
+2. redistribute ip 10.20.2.0/24 allow
+3. redistribute local deny  ← Must come AFTER allow rules
+4. redistribute deny
