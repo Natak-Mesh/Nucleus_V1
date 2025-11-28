@@ -11,7 +11,6 @@
         <img src="{{ url_for('static', filename='images/NatakMeshsecondary-overlay.png') }}" alt="Natak Mesh" class="logo">
         <nav>
             <button class="nav-btn" onclick="window.location.href='/config'">Configuration</button>
-            <button class="nav-btn" onclick="alert('Network Map - Coming Soon')">Network Map</button>
             <button class="nav-btn" onclick="alert('System Status - Coming Soon')">System Status</button>
         </nav>
     </header>
@@ -65,6 +64,16 @@
                             <span class="label">${node.duration_label}:</span>
                             <span class="value">${node.duration}</span>
                         </div>
+                        ${node.routes && node.routes.length > 0 ? `
+                        <div class="node-routes">
+                            <span class="label">Gateway to:</span>
+                            <ul class="routes-list">
+                                ${node.routes.map(route => `
+                                    <li>${route.prefix} <span class="route-cost">(cost: ${route.metric})</span></li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
                     </div>
                     <div class="node-status-label ${node.status}">
                         ${node.status.toUpperCase()}

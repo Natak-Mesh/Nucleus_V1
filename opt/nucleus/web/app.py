@@ -114,6 +114,29 @@ def parse_babeld_dump(dump_data):
     return neighbors
 
 
+def parse_babeld_routes(dump_data):
+    """Parse babeld dump output for route information"""
+    routes = []
+    for line in dump_data.split('\n'):
+        if line.startswith('add route'):
+            # Parse: add route <id> prefix <prefix> from <from> installed <yes/no> ... metric <metric> ... via <ipv6> if <interface>
+            parts = line.split()
+            route = {}
+            for i, part in enumerate(parts):
+                if part == 'prefix' and i + 1 < len(parts):
+                    route['prefix'] = parts[i + 1]
+                elif part == 'metric' and i + 1 < len(parts):
+                    route['metric'] = parts[i + 1]
+                elif part == 'via' and i + 1 < len(parts):
+                    route['via'] = parts[i + 1]
+                elif part == 'installed' and i + 1 < len(parts):
+                    route['installed'] = parts[i + 1] == 'yes'
+            # Only include installed routes with a next-hop
+            if 'prefix' in route and 'via' in route and route.get('installed'):
+                routes.append(route)
+    return routes
+
+
 def get_mesh_nodes():
     """Get current mesh node status"""
     # Query babeld
@@ -124,12 +147,26 @@ def get_mesh_nodes():
     babel_neighbors = parse_babeld_dump(dump_data)
     print(f"DEBUG: Found {len(babel_neighbors)} babel neighbors: {babel_neighbors}")
     
+    babel_routes = parse_babeld_routes(dump_data)
+    print(f"DEBUG: Found {len(babel_routes)} babel routes: {babel_routes}")
+    
     # Get neighbor caches
     ipv6_neighbors = get_ipv6_neighbors()
     print(f"DEBUG: IPv6 neighbors: {ipv6_neighbors}")
     
     ipv4_neighbors = get_ipv4_neighbors()
     print(f"DEBUG: IPv4 neighbors: {ipv4_neighbors}")
+    
+    # Group routes by their next-hop IPv6 address
+    routes_by_nexthop = {}
+    for route in babel_routes:
+        nexthop = route['via']
+        if nexthop not in routes_by_nexthop:
+            routes_by_nexthop[nexthop] = []
+        routes_by_nexthop[nexthop].append({
+            'prefix': route['prefix'],
+            'metric': route['metric']
+        })
     
     # Correlate data - match by interface (wlan1)
     # Since babeld shows neighbors on wlan1 and we have IPv4 neighbors on wlan1,
@@ -170,13 +207,17 @@ def get_mesh_nodes():
                 else:
                     cost_quality = 'poor'
                 
+                # Get routes via this neighbor
+                neighbor_routes = routes_by_nexthop.get(neighbor['ipv6'], [])
+                
                 nodes.append({
                     'ipv4': ipv4,
                     'cost': neighbor['cost'],
                     'cost_quality': cost_quality,
                     'status': 'connected',
                     'duration': duration_str,
-                    'duration_label': 'Connected for'
+                    'duration_label': 'Connected for',
+                    'routes': neighbor_routes
                 })
     
     # Check for recently disconnected nodes
@@ -190,7 +231,8 @@ def get_mesh_nodes():
                     'cost': 'N/A',
                     'status': 'disconnected',
                     'duration': duration_str,
-                    'duration_label': 'Disconnected'
+                    'duration_label': 'Disconnected',
+                    'routes': []
                 })
             else:
                 # Remove from history if too old

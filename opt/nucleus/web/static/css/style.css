@@ -143,6 +143,35 @@ main {
     margin-bottom: 8px;
 }
 
+.node-routes {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.node-routes .label {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.routes-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.routes-list li {
+    padding: 4px 0;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: monospace;
+}
+
+.route-cost {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
 .label {
     color: var(--text-secondary);
     font-size: 14px;
