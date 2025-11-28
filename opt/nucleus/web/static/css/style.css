@@ -184,6 +184,21 @@ main {
     font-size: 0.95rem;
 }
 
+.value.cost-good {
+    color: var(--color-connected);
+    font-weight: 700;
+}
+
+.value.cost-fair {
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+.value.cost-poor {
+    color: var(--color-disconnected);
+    font-weight: 700;
+}
+
 .node-status-label {
     position: absolute;
     top: 0;

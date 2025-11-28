@@ -161,9 +161,19 @@ def get_mesh_nodes():
                 duration = current_time - node_history[ipv4]['first_seen']
                 duration_str = format_duration(duration)
                 
+                # Classify cost quality
+                cost_val = int(neighbor['cost'])
+                if cost_val < 400:
+                    cost_quality = 'good'
+                elif cost_val < 700:
+                    cost_quality = 'fair'
+                else:
+                    cost_quality = 'poor'
+                
                 nodes.append({
                     'ipv4': ipv4,
                     'cost': neighbor['cost'],
+                    'cost_quality': cost_quality,
                     'status': 'connected',
                     'duration': duration_str,
                     'duration_label': 'Connected for'

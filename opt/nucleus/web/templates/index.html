@@ -58,8 +58,8 @@
                     </div>
                     <div class="node-body">
                         <div class="node-metric">
-                            <span class="label">Link Quality:</span>
-                            <span class="value">${node.cost}</span>
+                            <span class="label">Link Cost:</span>
+                            <span class="value cost-${node.cost_quality || 'unknown'}">${node.cost}</span>
                         </div>
                         <div class="node-duration">
                             <span class="label">${node.duration_label}:</span>
