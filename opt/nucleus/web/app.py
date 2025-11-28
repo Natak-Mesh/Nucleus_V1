@@ -4,7 +4,7 @@ Natak Mesh - Web Interface
 Simple Flask app for monitoring mesh network connections
 """
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import socket
 import subprocess
 import re
@@ -230,6 +230,74 @@ def api_nodes():
         'nodes': nodes,
         'timestamp': datetime.now().isoformat()
     })
+
+
+@app.route('/config')
+def config():
+    """Configuration page"""
+    return render_template('config.html')
+
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Read mesh configuration"""
+    try:
+        config = {}
+        with open('/etc/nucleus/mesh.conf', 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    config[key] = value.strip('"')
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config', methods=['POST'])
+def save_config():
+    """Save mesh configuration"""
+    try:
+        config = request.json
+        
+        # Read existing file
+        with open('/etc/nucleus/mesh.conf', 'r') as f:
+            lines = f.readlines()
+        
+        # Update values
+        new_lines = []
+        for line in lines:
+            if '=' in line and not line.strip().startswith('#'):
+                key = line.split('=')[0].strip()
+                if key in config:
+                    new_lines.append(f'{key}="{config[key]}"\n')
+                else:
+                    new_lines.append(line)
+            else:
+                new_lines.append(line)
+        
+        # Write back
+        with open('/etc/nucleus/mesh.conf', 'w') as f:
+            f.writelines(new_lines)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/apply_config', methods=['POST'])
+def apply_config():
+    """Run config generation script"""
+    try:
+        result = subprocess.run(['/opt/nucleus/bin/config_generation.sh'],
+                              capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            return jsonify({'success': True, 'output': result.stdout})
+        else:
+            return jsonify({'error': result.stderr}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
