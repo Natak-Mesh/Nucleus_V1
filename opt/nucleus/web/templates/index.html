@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natak Mesh - Network Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <img src="{{ url_for('static', filename='images/NatakMeshsecondary-overlay.png') }}" alt="Natak Mesh" class="logo">
+        <nav>
+            <button class="nav-btn" onclick="alert('Configuration - Coming Soon')">Configuration</button>
+            <button class="nav-btn" onclick="alert('Network Map - Coming Soon')">Network Map</button>
+            <button class="nav-btn" onclick="alert('System Status - Coming Soon')">System Status</button>
+        </nav>
+    </header>
+
+    <main>
+        <div class="dashboard">
+            <h1>Mesh Network Nodes</h1>
+            <div id="node-container" class="node-grid">
+                <div class="loading">Loading mesh nodes...</div>
+            </div>
+            <div id="last-update">Last updated: Never</div>
+        </div>
+    </main>
+
+    <script>
+        const REFRESH_INTERVAL = {{ refresh_interval }} * 1000; // Convert to milliseconds
+        let updateInterval;
+
+        async function fetchNodes() {
+            try {
+                const response = await fetch('/api/nodes');
+                const data = await response.json();
+                renderNodes(data.nodes);
+                updateTimestamp(data.timestamp);
+            } catch (error) {
+                console.error('Error fetching nodes:', error);
+                document.getElementById('node-container').innerHTML = '<div class="error">Error loading mesh data</div>';
+            }
+        }
+
+        function renderNodes(nodes) {
+            const container = document.getElementById('node-container');
+            
+            if (nodes.length === 0) {
+                container.innerHTML = '<div class="no-nodes">No mesh nodes detected</div>';
+                return;
+            }
+
+            container.innerHTML = nodes.map(node => `
+                <div class="node-card ${node.status}">
+                    <div class="node-header">
+                        <span class="node-ip">${node.ipv4}</span>
+                        <span class="status-indicator ${node.status}">${node.status === 'connected' ? '●' : '○'}</span>
+                    </div>
+                    <div class="node-body">
+                        <div class="node-metric">
+                            <span class="label">Link Quality:</span>
+                            <span class="value">${node.cost}</span>
+                        </div>
+                        <div class="node-duration">
+                            <span class="label">${node.duration_label}:</span>
+                            <span class="value">${node.duration}</span>
+                        </div>
+                    </div>
+                    <div class="node-status-label ${node.status}">
+                        ${node.status.toUpperCase()}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            const timeString = date.toLocaleTimeString();
+            document.getElementById('last-update').textContent = `Last updated: ${timeString}`;
+        }
+
+        // Initial fetch
+        fetchNodes();
+
+        // Set up auto-refresh
+        updateInterval = setInterval(fetchNodes, REFRESH_INTERVAL);
+
+        // Refresh on visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                fetchNodes();
+            }
+        });
+    </script>
+</body>
+</html>

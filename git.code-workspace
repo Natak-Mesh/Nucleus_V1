@@ -19,5 +19,7 @@
 			"path": "../../../etc/nucleus"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "nucleus"
+	}
 }

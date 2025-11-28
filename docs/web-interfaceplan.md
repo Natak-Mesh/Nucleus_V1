@@ -58,26 +58,23 @@ echo "dump" | nc localhost 33123
 Provides:
 - Neighbor link-local IPv6 addresses (e.g., `fe80::11`)
 - Link quality metrics: `cost`, `reach`, `rxcost`, `txcost`
+- Interface information (wlan1)
 - Router IDs
 - Route information
 
-**2. IPv6 Neighbor Cache**
-```bash
-ip -6 neigh show dev wlan1
-```
-Maps: IPv6 link-local → MAC address
-
-**3. IPv4 Neighbor Cache**
+**2. IPv4 Neighbor Cache**
 ```bash
 ip neigh show dev wlan1
 ```
-Maps: MAC address → IPv4 address
+Provides: IPv4 addresses of neighbors on wlan1 interface
 
 ### Correlation Logic
-1. Query babeld for neighbor `fe80::11` with link metrics
-2. Query IPv6 neighbor cache: `fe80::11` → MAC `00:c0:ca:b7:af:be`
-3. Query IPv4 neighbor cache: MAC `00:c0:ca:b7:af:be` → IP `10.20.1.11`
-4. Result: Display `10.20.1.11` with babeld's link quality metrics
+1. Query babeld for neighbors on wlan1 with link metrics
+2. Query IPv4 neighbor cache for addresses on wlan1
+3. Match neighbors by interface (both on wlan1)
+4. Result: Display IPv4 addresses with babeld's link quality metrics
+
+**Note:** IPv6 neighbor cache not used since kernel doesn't maintain fe80 neighbors for wlan1. Simplified approach matches by interface instead of MAC address.
 
 ### Web Interface Implementation
 - Connect to babeld's monitoring port (localhost:33123)
