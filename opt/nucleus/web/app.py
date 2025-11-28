@@ -254,17 +254,16 @@ def get_config():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/config', methods=['POST'])
-def save_config():
-    """Save mesh configuration"""
+@app.route('/api/apply_and_reboot', methods=['POST'])
+def apply_and_reboot():
+    """Save config, run config generation, and reboot system"""
     try:
         config = request.json
         
-        # Read existing file
+        # Step 1: Save configuration to mesh.conf
         with open('/etc/nucleus/mesh.conf', 'r') as f:
             lines = f.readlines()
         
-        # Update values
         new_lines = []
         for line in lines:
             if '=' in line and not line.strip().startswith('#'):
@@ -276,26 +275,20 @@ def save_config():
             else:
                 new_lines.append(line)
         
-        # Write back
         with open('/etc/nucleus/mesh.conf', 'w') as f:
             f.writelines(new_lines)
         
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/apply_config', methods=['POST'])
-def apply_config():
-    """Run config generation script"""
-    try:
+        # Step 2: Run config generation script
         result = subprocess.run(['/opt/nucleus/bin/config_generation.sh'],
                               capture_output=True, text=True, timeout=30)
         
-        if result.returncode == 0:
-            return jsonify({'success': True, 'output': result.stdout})
-        else:
-            return jsonify({'error': result.stderr}), 500
+        if result.returncode != 0:
+            return jsonify({'error': f'Config generation failed: {result.stderr}'}), 500
+        
+        # Step 3: Reboot system (in background to allow response)
+        subprocess.Popen(['sudo', 'reboot'])
+        
+        return jsonify({'success': True, 'message': 'Configuration applied, system rebooting'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

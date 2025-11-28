@@ -57,18 +57,18 @@ nav {
 
 .nav-btn {
     padding: 8px 16px;
-    background-color: transparent;
+    background-color: var(--accent-secondary);
     color: var(--text-primary);
-    border: 1px solid #444;
+    border: 1px solid var(--accent-secondary);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.95rem;
     font-weight: normal;
-    transition: background-color 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 
 .nav-btn:hover {
-    background-color: #444;
+    opacity: 0.8;
 }
 
 /* Main Content */

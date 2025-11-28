@@ -65,7 +65,7 @@
             opacity: 0.8;
         }
         .btn-primary {
-            background-color: var(--accent-primary);
+            background-color: var(--accent-secondary);
             color: var(--bg-primary);
         }
         .btn-secondary {
@@ -167,9 +167,14 @@
                         <div class="current-value">Current: <span id="current-AP_CHANNEL">-</span></div>
                     </div>
                     
+                    <div class="config-field">
+                        <label>AP_PASSWORD</label>
+                        <input type="text" name="AP_PASSWORD" id="AP_PASSWORD" required>
+                        <div class="current-value">Current: <span id="current-AP_PASSWORD">-</span></div>
+                    </div>
+                    
                     <div class="button-group">
-                        <button type="submit" class="btn btn-primary">Save Configuration</button>
-                        <button type="button" class="btn btn-apply" onclick="applyConfig()">Apply Configuration</button>
+                        <button type="button" class="btn btn-apply" onclick="applyConfig()">Apply Configuration Changes</button>
                     </div>
                 </form>
             </div>
@@ -193,41 +198,39 @@
             }
         }
 
-        document.getElementById('config-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
+        async function applyConfig() {
+            // Show confirmation warning
+            const confirmed = confirm(
+                'WARNING: This will overwrite existing configuration and reboot the system. ' +
+                'You may lose connectivity. Continue?'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            // Get form data
+            const formData = new FormData(document.getElementById('config-form'));
             const config = Object.fromEntries(formData);
             
             try {
-                const response = await fetch('/api/config', {
+                showMessage('Applying configuration and rebooting system...', 'success');
+                
+                const response = await fetch('/api/apply_and_reboot', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(config)
                 });
                 
-                if (response.ok) {
-                    showMessage('Configuration saved successfully', 'success');
-                    loadConfig();
-                } else {
-                    showMessage('Error saving configuration', 'error');
-                }
-            } catch (error) {
-                showMessage('Error saving configuration', 'error');
-            }
-        });
-
-        async function applyConfig() {
-            try {
-                const response = await fetch('/api/apply_config', {method: 'POST'});
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showMessage('Configuration applied successfully', 'success');
+                    showMessage('Configuration applied. System rebooting...', 'success');
                 } else {
                     showMessage(`Error: ${result.error}`, 'error');
                 }
             } catch (error) {
-                showMessage('Error applying configuration', 'error');
+                showMessage('Configuration applied. System rebooting...', 'success');
             }
         }
 
