@@ -16,7 +16,6 @@ sudo cp "$SOURCE_DIR/etc/nucleus/mesh.conf" /etc/nucleus/
 sudo cp -r "$SOURCE_DIR/etc/systemd/network" /etc/systemd/
 sudo mkdir -p /etc/NetworkManager/conf.d
 sudo cp "$SOURCE_DIR/etc/NetworkManager/conf.d/unmanaged-devices.conf" /etc/NetworkManager/conf.d/
-sudo cp "$SOURCE_DIR/etc/babeld.conf" /etc/
 sudo cp "$SOURCE_DIR/etc/smcroute.conf" /etc/
 
 # Copy systemd service files
