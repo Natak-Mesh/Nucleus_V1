@@ -99,6 +99,41 @@ def get_ipv6_neighbors():
         return {}
 
 
+def get_babel_nexthops():
+    """Get IPv4 next-hop addresses from Babel routes in kernel routing table"""
+    try:
+        result = subprocess.run(['ip', 'route', 'show', 'proto', 'babel', 'dev', 'wlan1'],
+                              capture_output=True, text=True)
+        nexthops = []
+        for line in result.stdout.strip().split('\n'):
+            if not line:
+                continue
+            # Parse: 10.20.2.0/24 via 10.20.1.11 dev wlan1 proto babel onlink
+            match = re.search(r'via\s+(\S+)', line)
+            if match:
+                nexthop_ip = match.group(1)
+                if nexthop_ip not in nexthops:
+                    nexthops.append(nexthop_ip)
+        return nexthops
+    except Exception as e:
+        print(f"Error getting Babel nexthops: {e}")
+        return []
+
+
+def probe_nexthops(nexthop_ips):
+    """Send probes to next-hop IPs to populate neighbor cache"""
+    for ip in nexthop_ips:
+        try:
+            # Fire and forget - non-blocking ping
+            subprocess.Popen(
+                ['ping', '-c', '1', '-W', '1', ip],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"Error probing {ip}: {e}")
+
+
 def get_ipv4_neighbors():
     """Get IPv4 neighbor cache on wlan1 interface"""
     try:
@@ -174,6 +209,12 @@ def get_mesh_nodes():
     
     babel_routes = parse_babeld_routes(dump_data)
     print(f"DEBUG: Found {len(babel_routes)} babel routes: {babel_routes}")
+    
+    # Probe Babel next-hops to populate IPv4 neighbor cache
+    nexthops = get_babel_nexthops()
+    if nexthops:
+        print(f"DEBUG: Probing nexthops: {nexthops}")
+        probe_nexthops(nexthops)
     
     # Get neighbor caches
     ipv6_neighbors = get_ipv6_neighbors()
