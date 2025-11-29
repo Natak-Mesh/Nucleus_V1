@@ -45,13 +45,13 @@ get_default_mode() {
 switch_to_wan() {
     echo "Switching eth0 to WAN mode (DHCP)..."
     
-    # Update network config file - remove Bridge line
+    # Update network config file - set DHCP
     cat > "$NETWORK_FILE" <<EOF
 [Match]
 Name=eth0
 
 [Network]
-
+DHCP=yes
 EOF
     
     # Apply immediately
@@ -101,7 +101,7 @@ show_status() {
     if [ "$current" = "wan" ]; then
         echo "eth0 is currently accepting DHCP from router"
     else
-        echo "eth0 is currently bridged to br-lan (192.168.50.x)"
+        echo "eth0 is currently bridged to br-lan"
     fi
 }
 
