@@ -8,22 +8,28 @@ SOURCE_DIR="$(pwd)"
 
 echo "Deploying from $SOURCE_DIR..."
 
-# Copy etc files
-sudo cp -r "$SOURCE_DIR/etc/hostapd" /etc/
-sudo cp -r "$SOURCE_DIR/etc/wpa_supplicant" /etc/
+# Copy etc files (only static configs - generated ones are created by config_generation.sh)
 sudo mkdir -p /etc/nucleus
 sudo cp "$SOURCE_DIR/etc/nucleus/mesh.conf" /etc/nucleus/
-sudo cp -r "$SOURCE_DIR/etc/systemd/network" /etc/systemd/
+sudo mkdir -p /etc/systemd/network
+sudo cp "$SOURCE_DIR/etc/systemd/network/20-brlan.netdev" /etc/systemd/network/
+sudo cp "$SOURCE_DIR/etc/systemd/network/30-wlan0.network" /etc/systemd/network/
+sudo cp "$SOURCE_DIR/etc/systemd/network/40-eth0-lan.network" /etc/systemd/network/
 sudo mkdir -p /etc/NetworkManager/conf.d
 sudo cp "$SOURCE_DIR/etc/NetworkManager/conf.d/unmanaged-devices.conf" /etc/NetworkManager/conf.d/
 sudo cp "$SOURCE_DIR/etc/smcroute.conf" /etc/
+sudo cp "$SOURCE_DIR/etc/babeld.conf" /etc/
 
 # Copy systemd service files
 sudo cp "$SOURCE_DIR/etc/systemd/system/brlan-setup.service" /etc/systemd/system/
+sudo cp "$SOURCE_DIR/etc/systemd/system/mesh-start.service" /etc/systemd/system/
+sudo cp "$SOURCE_DIR/etc/systemd/system/mesh-web.service" /etc/systemd/system/
 sudo mkdir -p /etc/systemd/system/babeld.service.d
 sudo cp "$SOURCE_DIR/etc/systemd/system/babeld.service.d/override.conf" /etc/systemd/system/babeld.service.d/
 sudo systemctl daemon-reload
 sudo systemctl enable brlan-setup.service
+sudo systemctl enable mesh-start.service
+sudo systemctl enable mesh-web.service
 
 # Copy opt files
 sudo mkdir -p /opt/nucleus/bin
