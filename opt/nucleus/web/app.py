@@ -13,6 +13,7 @@ import threading
 import signal
 import csv
 import os
+import sys
 import glob
 from collections import defaultdict
 import time
@@ -547,6 +548,15 @@ def run_channel_scan(duration):
                           capture_output=True)
             subprocess.run(['sudo', 'systemctl', 'start', 'mesh-start.service'], 
                           capture_output=True)
+            
+            # Wait for mesh to stabilize and Babel to install routes
+            time.sleep(10)
+            
+            # Probe nexthops to populate IPv4 neighbor cache
+            nexthops = get_babel_nexthops()
+            if nexthops:
+                print(f"DEBUG: Post-scan probing nexthops: {nexthops}")
+                probe_nexthops(nexthops)
         except:
             pass
 
@@ -739,19 +749,25 @@ def get_channel_scan_results():
 
 @app.route('/api/restart-mesh', methods=['POST'])
 def restart_mesh():
-    """Restart mesh services"""
+    """Restart Flask application"""
     try:
-        # Restart mesh-start service
-        result = subprocess.run(['sudo', 'systemctl', 'restart', 'mesh-start.service'],
-                              capture_output=True, text=True, timeout=10)
-        
-        if result.returncode != 0:
-            return jsonify({'error': f'Failed to restart mesh services: {result.stderr}'}), 500
-        
-        return jsonify({
+        # Send success response before restart
+        response = jsonify({
             'success': True,
-            'message': 'Mesh services restarted successfully'
+            'message': 'Restarting application...'
         })
+        
+        # Schedule restart after response is sent
+        def do_restart():
+            time.sleep(0.5)  # Allow response to be sent
+            os.execv(sys.executable, ['python3', os.path.abspath(__file__)])
+        
+        import threading
+        restart_thread = threading.Thread(target=do_restart)
+        restart_thread.daemon = True
+        restart_thread.start()
+        
+        return response
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
