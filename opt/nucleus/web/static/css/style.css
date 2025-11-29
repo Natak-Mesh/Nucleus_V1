@@ -195,6 +195,46 @@ main {
     color: var(--color-disconnected);
 }
 
+/* WiFi Performance Section */
+.node-wifi {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.wifi-header {
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: normal;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wifi-metric {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+/* Signal strength colors */
+.value.signal-excellent {
+    color: var(--color-connected);
+}
+
+.value.signal-good {
+    color: #66ff66;
+}
+
+.value.signal-fair {
+    color: var(--color-warning);
+}
+
+.value.signal-poor {
+    color: var(--color-disconnected);
+}
+
 .node-status-label {
     position: absolute;
     top: 0;

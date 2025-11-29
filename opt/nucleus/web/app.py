@@ -135,24 +135,122 @@ def probe_nexthops(nexthop_ips):
             print(f"Error probing {ip}: {e}")
 
 
+def probe_ipv6_neighbors(ipv6_addresses):
+    """Send probes to IPv6 link-local addresses to populate neighbor cache"""
+    for ipv6 in ipv6_addresses:
+        try:
+            # Fire and forget - use ping6 with interface specification for link-local
+            subprocess.Popen(
+                ['ping6', '-c', '1', '-W', '1', '-I', 'wlan1', ipv6],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"Error probing IPv6 {ipv6}: {e}")
+
+
 def get_ipv4_neighbors():
-    """Get IPv4 neighbor cache on wlan1 interface"""
+    """Get IPv4 neighbor cache on wlan1 interface - returns dict {mac: ipv4}"""
     try:
         result = subprocess.run(['ip', 'neigh', 'show', 'dev', 'wlan1'],
                               capture_output=True, text=True)
-        neighbors = []
+        neighbors = {}
         for line in result.stdout.strip().split('\n'):
             if not line:
                 continue
-            # Parse: 10.20.1.11 dev wlan1 lladdr 00:c0:ca:b7:af:be STALE
-            match = re.match(r'(\S+)\s+', line)
+            # Parse: 10.20.1.11 lladdr 00:c0:ca:b7:af:be REACHABLE
+            match = re.match(r'(\S+)\s+lladdr\s+(\S+)', line)
             if match:
-                ipv4 = match.group(1)
-                neighbors.append(ipv4)
+                addr, mac = match.groups()
+                # Skip IPv6 addresses (they contain colons)
+                if ':' not in addr:
+                    neighbors[mac.lower()] = addr
         return neighbors
     except Exception as e:
         print(f"Error getting IPv4 neighbors: {e}")
-        return []
+        return {}
+
+
+def get_wifi_station_stats():
+    """Get WiFi statistics for all stations from iw wlan1 station dump - returns dict {mac: stats}"""
+    try:
+        result = subprocess.run(['iw', 'wlan1', 'station', 'dump'],
+                              capture_output=True, text=True)
+        stations = {}
+        current_mac = None
+        current_stats = {}
+        
+        for line in result.stdout.split('\n'):
+            line = line.strip()
+            
+            # New station entry
+            if line.startswith('Station '):
+                # Save previous station if exists
+                if current_mac and current_stats:
+                    stations[current_mac] = current_stats
+                
+                # Parse MAC from "Station 00:c0:ca:b7:af:be (on wlan1)"
+                match = re.match(r'Station\s+(\S+)', line)
+                if match:
+                    current_mac = match.group(1).lower()
+                    current_stats = {}
+            
+            # Parse signal strength
+            elif 'signal:' in line and current_mac:
+                match = re.search(r'signal:\s+([-\d]+)', line)
+                if match:
+                    current_stats['signal'] = int(match.group(1))
+            
+            # Parse signal average
+            elif 'signal avg:' in line and current_mac:
+                match = re.search(r'signal avg:\s+([-\d]+)', line)
+                if match:
+                    current_stats['signal_avg'] = int(match.group(1))
+            
+            # Parse tx bitrate
+            elif 'tx bitrate:' in line and current_mac:
+                # Parse "tx bitrate: 72.2 MBit/s MCS 7 short GI"
+                match = re.search(r'tx bitrate:\s+([\d.]+)\s+MBit/s(?:\s+MCS\s+(\d+))?', line)
+                if match:
+                    current_stats['tx_bitrate'] = float(match.group(1))
+                    if match.group(2):
+                        current_stats['tx_mcs'] = int(match.group(2))
+            
+            # Parse rx bitrate
+            elif 'rx bitrate:' in line and current_mac:
+                # Parse "rx bitrate: 43.3 MBit/s MCS 4 short GI"
+                match = re.search(r'rx bitrate:\s+([\d.]+)\s+MBit/s(?:\s+MCS\s+(\d+))?', line)
+                if match:
+                    current_stats['rx_bitrate'] = float(match.group(1))
+                    if match.group(2):
+                        current_stats['rx_mcs'] = int(match.group(2))
+            
+            # Parse expected throughput
+            elif 'expected throughput:' in line and current_mac:
+                # Parse "expected throughput: 28.655Mbps"
+                match = re.search(r'expected throughput:\s+([\d.]+)', line)
+                if match:
+                    current_stats['expected_throughput'] = float(match.group(1))
+            
+            # Parse tx retries/failed for link quality
+            elif 'tx retries:' in line and current_mac:
+                match = re.search(r'tx retries:\s+(\d+)', line)
+                if match:
+                    current_stats['tx_retries'] = int(match.group(1))
+            
+            elif 'tx failed:' in line and current_mac:
+                match = re.search(r'tx failed:\s+(\d+)', line)
+                if match:
+                    current_stats['tx_failed'] = int(match.group(1))
+        
+        # Don't forget the last station
+        if current_mac and current_stats:
+            stations[current_mac] = current_stats
+        
+        return stations
+    except Exception as e:
+        print(f"Error getting WiFi station stats: {e}")
+        return {}
 
 
 def parse_babeld_dump(dump_data):
@@ -203,7 +301,6 @@ def get_mesh_nodes():
     # Query babeld
     dump_data = query_babeld()
     print(f"DEBUG: Babeld dump data length: {len(dump_data)} bytes")
-    print(f"DEBUG: Babeld dump preview: {dump_data[:200] if dump_data else 'EMPTY'}")
     
     babel_neighbors = parse_babeld_dump(dump_data)
     print(f"DEBUG: Found {len(babel_neighbors)} babel neighbors: {babel_neighbors}")
@@ -211,18 +308,28 @@ def get_mesh_nodes():
     babel_routes = parse_babeld_routes(dump_data)
     print(f"DEBUG: Found {len(babel_routes)} babel routes: {babel_routes}")
     
+    # Probe IPv6 neighbors from Babel to populate IPv6 neighbor cache
+    if babel_neighbors:
+        ipv6_list = [n['ipv6'] for n in babel_neighbors]
+        print(f"DEBUG: Probing IPv6 neighbors: {ipv6_list}")
+        probe_ipv6_neighbors(ipv6_list)
+        time.sleep(0.5)  # Allow neighbor cache to populate
+    
     # Probe Babel next-hops to populate IPv4 neighbor cache
     nexthops = get_babel_nexthops()
     if nexthops:
-        print(f"DEBUG: Probing nexthops: {nexthops}")
+        print(f"DEBUG: Probing IPv4 nexthops: {nexthops}")
         probe_nexthops(nexthops)
+        time.sleep(0.5)  # Allow neighbor cache to populate
     
-    # Get neighbor caches
-    ipv6_neighbors = get_ipv6_neighbors()
+    # Get all data sources
+    ipv6_neighbors = get_ipv6_neighbors()  # {ipv6: mac}
+    ipv4_neighbors = get_ipv4_neighbors()  # {mac: ipv4}
+    wifi_stats = get_wifi_station_stats()  # {mac: stats}
+    
     print(f"DEBUG: IPv6 neighbors: {ipv6_neighbors}")
-    
-    ipv4_neighbors = get_ipv4_neighbors()
     print(f"DEBUG: IPv4 neighbors: {ipv4_neighbors}")
+    print(f"DEBUG: WiFi stats: {wifi_stats}")
     
     # Group routes by their next-hop IPv6 address
     routes_by_nexthop = {}
@@ -235,57 +342,100 @@ def get_mesh_nodes():
             'metric': route['metric']
         })
     
-    # Correlate data - match by interface (wlan1)
-    # Since babeld shows neighbors on wlan1 and we have IPv4 neighbors on wlan1,
-    # we pair them up (typically 1:1 mapping)
+    # Correlate data using MAC address as the key
     current_time = datetime.now()
     active_nodes = set()
     nodes = []
     
-    # Match babel neighbors to IPv4 addresses on wlan1
-    if babel_neighbors and ipv4_neighbors:
-        # Pair up babel neighbors with IPv4 addresses
-        for i, neighbor in enumerate(babel_neighbors):
-            if i < len(ipv4_neighbors):
-                ipv4 = ipv4_neighbors[i]
-                active_nodes.add(ipv4)
-                
-                # Track connection time
-                if ipv4 not in node_history:
-                    node_history[ipv4] = {
-                        'first_seen': current_time,
-                        'last_seen': current_time,
-                        'status': 'connected'
-                    }
-                else:
-                    node_history[ipv4]['last_seen'] = current_time
-                    node_history[ipv4]['status'] = 'connected'
-                
-                # Calculate duration
-                duration = current_time - node_history[ipv4]['first_seen']
-                duration_str = format_duration(duration)
-                
-                # Classify cost quality
-                cost_val = int(neighbor['cost'])
-                if cost_val < 400:
-                    cost_quality = 'good'
-                elif cost_val < 700:
-                    cost_quality = 'fair'
-                else:
-                    cost_quality = 'poor'
-                
-                # Get routes via this neighbor
-                neighbor_routes = routes_by_nexthop.get(neighbor['ipv6'], [])
-                
-                nodes.append({
-                    'ipv4': ipv4,
-                    'cost': neighbor['cost'],
-                    'cost_quality': cost_quality,
-                    'status': 'connected',
-                    'duration': duration_str,
-                    'duration_label': 'Connected for',
-                    'routes': neighbor_routes
-                })
+    for babel_neighbor in babel_neighbors:
+        babel_ipv6 = babel_neighbor['ipv6']
+        
+        # Get MAC address from IPv6 neighbor cache
+        mac = ipv6_neighbors.get(babel_ipv6)
+        if not mac:
+            print(f"DEBUG: No MAC found for IPv6 {babel_ipv6}")
+            continue
+        
+        mac = mac.lower()
+        
+        # Get IPv4 address from IPv4 neighbor cache
+        ipv4 = ipv4_neighbors.get(mac)
+        print(f"DEBUG: MAC {mac} → IPv4 {ipv4}, babel_ipv6 was {babel_ipv6}")
+        if not ipv4:
+            print(f"DEBUG: No IPv4 found for MAC {mac}")
+            continue
+        
+        active_nodes.add(ipv4)
+        
+        # Track connection time
+        if ipv4 not in node_history:
+            node_history[ipv4] = {
+                'first_seen': current_time,
+                'last_seen': current_time,
+                'status': 'connected'
+            }
+        else:
+            node_history[ipv4]['last_seen'] = current_time
+            node_history[ipv4]['status'] = 'connected'
+        
+        # Calculate duration
+        duration = current_time - node_history[ipv4]['first_seen']
+        duration_str = format_duration(duration)
+        
+        # Classify cost quality
+        cost_val = int(babel_neighbor['cost'])
+        if cost_val < 400:
+            cost_quality = 'good'
+        elif cost_val < 700:
+            cost_quality = 'fair'
+        else:
+            cost_quality = 'poor'
+        
+        # Get routes via this neighbor
+        neighbor_routes = routes_by_nexthop.get(babel_ipv6, [])
+        
+        # Get WiFi stats for this MAC
+        wifi = wifi_stats.get(mac, {})
+        
+        # Classify signal strength
+        signal_quality = None
+        if 'signal_avg' in wifi:
+            sig = wifi['signal_avg']
+            if sig >= -50:
+                signal_quality = 'excellent'
+            elif sig >= -60:
+                signal_quality = 'good'
+            elif sig >= -70:
+                signal_quality = 'fair'
+            else:
+                signal_quality = 'poor'
+        
+        node = {
+            'ipv4': ipv4,
+            'cost': babel_neighbor['cost'],
+            'cost_quality': cost_quality,
+            'status': 'connected',
+            'duration': duration_str,
+            'duration_label': 'Connected for',
+            'routes': neighbor_routes
+        }
+        
+        # Add WiFi metrics if available
+        if wifi:
+            node['wifi'] = {
+                'signal': wifi.get('signal'),
+                'signal_avg': wifi.get('signal_avg'),
+                'signal_quality': signal_quality,
+                'tx_bitrate': wifi.get('tx_bitrate'),
+                'tx_mcs': wifi.get('tx_mcs'),
+                'rx_bitrate': wifi.get('rx_bitrate'),
+                'rx_mcs': wifi.get('rx_mcs'),
+                'expected_throughput': wifi.get('expected_throughput'),
+                'tx_retries': wifi.get('tx_retries'),
+                'tx_failed': wifi.get('tx_failed')
+            }
+        
+        nodes.append(node)
     
     # Check for recently disconnected nodes
     for ipv4, info in list(node_history.items()):

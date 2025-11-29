@@ -64,6 +64,35 @@
                             <span class="label">${node.duration_label}:</span>
                             <span class="value">${node.duration}</span>
                         </div>
+                        ${node.wifi ? `
+                        <div class="node-wifi">
+                            <div class="wifi-header">WiFi Performance</div>
+                            ${node.wifi.signal_avg !== null ? `
+                            <div class="wifi-metric">
+                                <span class="label">Signal:</span>
+                                <span class="value signal-${node.wifi.signal_quality}">${node.wifi.signal_avg} dBm</span>
+                            </div>
+                            ` : ''}
+                            ${node.wifi.tx_bitrate !== null ? `
+                            <div class="wifi-metric">
+                                <span class="label">TX Rate:</span>
+                                <span class="value">${node.wifi.tx_bitrate} Mbps${node.wifi.tx_mcs !== null ? ` (MCS ${node.wifi.tx_mcs})` : ''}</span>
+                            </div>
+                            ` : ''}
+                            ${node.wifi.rx_bitrate !== null ? `
+                            <div class="wifi-metric">
+                                <span class="label">RX Rate:</span>
+                                <span class="value">${node.wifi.rx_bitrate} Mbps${node.wifi.rx_mcs !== null ? ` (MCS ${node.wifi.rx_mcs})` : ''}</span>
+                            </div>
+                            ` : ''}
+                            ${node.wifi.expected_throughput !== null ? `
+                            <div class="wifi-metric">
+                                <span class="label">Throughput:</span>
+                                <span class="value">${node.wifi.expected_throughput.toFixed(1)} Mbps</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
                         ${node.routes && node.routes.length > 0 ? `
                         <div class="node-routes">
                             <span class="label">Gateway to:</span>
