@@ -2,6 +2,7 @@
 
 # Deploy Nucleus OS files to system locations
 # NOTE: Run ./install-packages.sh first to install required software packages
+# NOTE: Run ./SSH_fix.sh on the node to optimize SSH settings
 
 set -e
 
