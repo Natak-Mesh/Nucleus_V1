@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Deploy Nucleus OS files to system locations
+# NOTE: Run ./install-packages.sh first to install required software packages
 
 set -e
 
