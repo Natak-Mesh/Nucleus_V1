@@ -17,6 +17,9 @@
 		},
 		{
 			"path": "../../../etc/nucleus"
+		},
+		{
+			"path": "../.reticulum"
 		}
 	],
 	"settings": {
