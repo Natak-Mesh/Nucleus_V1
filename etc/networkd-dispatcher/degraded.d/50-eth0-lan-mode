@@ -1,0 +1,32 @@
+#!/bin/bash
+# ===============================================================
+# LAN MODE DISPATCHER SCRIPT
+# Triggered when eth0 falls back to IPv4LL (DHCP failed - device/laptop connected)
+# ===============================================================
+
+IFACE=$1
+STATE=$2
+
+# Only act on eth0 in degraded state
+if [ "$IFACE" != "eth0" ]; then
+    exit 0
+fi
+
+logger -t eth0-lan-mode "eth0 entered LAN mode (DHCP failed, IPv4LL fallback)"
+
+# Enable DHCP server on eth0 via drop-in configuration
+logger -t eth0-lan-mode "Enabling DHCP server on eth0"
+
+# Create drop-in directory if it doesn't exist
+mkdir -p /etc/systemd/network/40-eth0-lan.network.d
+
+# Create drop-in file to enable DHCP server
+cat > /etc/systemd/network/40-eth0-lan.network.d/dhcp-server-enable.conf <<EOF
+[Network]
+DHCPServer=yes
+EOF
+
+# Reconfigure eth0 to apply the change
+networkctl reconfigure eth0
+
+logger -t eth0-lan-mode "LAN mode configuration complete - DHCP server active on 10.10.10.1/24"

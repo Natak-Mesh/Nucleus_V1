@@ -1,0 +1,30 @@
+#!/bin/bash
+# ===============================================================
+# WAN MODE DISPATCHER SCRIPT
+# Triggered when eth0 gets a routable DHCP address (router connected)
+# ===============================================================
+
+IFACE=$1
+STATE=$2
+
+# Only act on eth0 in routable state
+if [ "$IFACE" != "eth0" ]; then
+    exit 0
+fi
+
+logger -t eth0-wan-mode "eth0 entered WAN mode (DHCP successful)"
+
+# Disable DHCP server on eth0
+# This prevents the Pi from serving DHCP when connected to a router network
+logger -t eth0-wan-mode "Disabling DHCP server on eth0"
+
+# Remove drop-in file that enables DHCP server (if it exists)
+if [ -f /etc/systemd/network/40-eth0-lan.network.d/dhcp-server-enable.conf ]; then
+    rm -f /etc/systemd/network/40-eth0-lan.network.d/dhcp-server-enable.conf
+    logger -t eth0-wan-mode "Removed DHCP server override"
+fi
+
+# Reconfigure eth0 to apply the change
+networkctl reconfigure eth0
+
+logger -t eth0-wan-mode "WAN mode configuration complete - eth0 forwarding to mesh enabled"
