@@ -14,14 +14,14 @@ fi
 
 logger -t eth0-wan-mode "eth0 entered WAN mode (DHCP successful)"
 
-# Disable DHCP server on eth0
+# Disable DHCP server and remove static IP from eth0
 # This prevents the Pi from serving DHCP when connected to a router network
-logger -t eth0-wan-mode "Disabling DHCP server on eth0"
+logger -t eth0-wan-mode "Disabling DHCP server and removing static IP on eth0"
 
-# Remove drop-in file that enables DHCP server (if it exists)
+# Remove drop-in file that enables DHCP server and static IP (if it exists)
 if [ -f /etc/systemd/network/40-eth0-lan.network.d/dhcp-server-enable.conf ]; then
     rm -f /etc/systemd/network/40-eth0-lan.network.d/dhcp-server-enable.conf
-    logger -t eth0-wan-mode "Removed DHCP server override"
+    logger -t eth0-wan-mode "Removed DHCP server and static IP override"
 fi
 
 # Reconfigure eth0 to apply the change

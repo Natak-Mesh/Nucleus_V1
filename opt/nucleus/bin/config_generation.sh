@@ -51,8 +51,8 @@ DHCP=ipv4
 # Fallback to IPv4LL when DHCP fails (triggers LAN mode)
 IPv4LL=yes
 
-# Static IP for LAN gateway mode
-Address=${ETH0_STATIC_IP}/24
+# Static IP for LAN gateway mode - added dynamically by dispatcher script
+# (No static Address in base config to prevent dual-IP issue)
 
 # Always enable forwarding between eth0 and mesh interfaces
 IPv4Forwarding=yes

@@ -12,21 +12,25 @@ if [ "$IFACE" != "eth0" ]; then
     exit 0
 fi
 
+# Source mesh configuration to get ETH0_STATIC_IP
+source /etc/nucleus/mesh.conf
+
 logger -t eth0-lan-mode "eth0 entered LAN mode (DHCP failed, IPv4LL fallback)"
 
-# Enable DHCP server on eth0 via drop-in configuration
-logger -t eth0-lan-mode "Enabling DHCP server on eth0"
+# Enable DHCP server and add static IP via drop-in configuration
+logger -t eth0-lan-mode "Enabling DHCP server and static IP ${ETH0_STATIC_IP}/24 on eth0"
 
 # Create drop-in directory if it doesn't exist
 mkdir -p /etc/systemd/network/40-eth0-lan.network.d
 
-# Create drop-in file to enable DHCP server
+# Create drop-in file to enable DHCP server and add static IP
 cat > /etc/systemd/network/40-eth0-lan.network.d/dhcp-server-enable.conf <<EOF
 [Network]
 DHCPServer=yes
+Address=${ETH0_STATIC_IP}/24
 EOF
 
 # Reconfigure eth0 to apply the change
 networkctl reconfigure eth0
 
-logger -t eth0-lan-mode "LAN mode configuration complete - DHCP server active on 10.10.10.1/24"
+logger -t eth0-lan-mode "LAN mode configuration complete - DHCP server active on ${ETH0_STATIC_IP}/24"
