@@ -22,6 +22,14 @@ sudo cp "$SOURCE_DIR/etc/NetworkManager/conf.d/unmanaged-devices.conf" /etc/Netw
 sudo cp "$SOURCE_DIR/etc/smcroute.conf" /etc/
 sudo cp "$SOURCE_DIR/etc/babeld.conf" /etc/
 
+# Copy networkd-dispatcher scripts
+sudo mkdir -p /etc/networkd-dispatcher/degraded.d
+sudo mkdir -p /etc/networkd-dispatcher/routable.d
+sudo cp "$SOURCE_DIR/etc/networkd-dispatcher/degraded.d/50-eth0-lan-mode" /etc/networkd-dispatcher/degraded.d/
+sudo cp "$SOURCE_DIR/etc/networkd-dispatcher/routable.d/50-eth0-wan-mode" /etc/networkd-dispatcher/routable.d/
+sudo chmod +x /etc/networkd-dispatcher/degraded.d/50-eth0-lan-mode
+sudo chmod +x /etc/networkd-dispatcher/routable.d/50-eth0-wan-mode
+
 # Copy systemd service files
 sudo cp "$SOURCE_DIR/etc/systemd/system/brlan-setup.service" /etc/systemd/system/
 sudo cp "$SOURCE_DIR/etc/systemd/system/mesh-start.service" /etc/systemd/system/
