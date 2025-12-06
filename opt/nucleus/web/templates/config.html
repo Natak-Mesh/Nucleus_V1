@@ -172,6 +172,24 @@
                         <div class="current-value">Current: <span id="current-AP_PASSWORD">-</span></div>
                     </div>
                     
+                    <div class="config-field">
+                        <label>ETH0_STATIC_IP (LAN Gateway IP)</label>
+                        <input type="text" name="ETH0_STATIC_IP" id="ETH0_STATIC_IP" required>
+                        <div class="current-value">Current: <span id="current-ETH0_STATIC_IP">-</span></div>
+                    </div>
+                    
+                    <div class="config-field">
+                        <label>ETH0_DHCP_POOL_OFFSET (DHCP Start Offset)</label>
+                        <input type="number" name="ETH0_DHCP_POOL_OFFSET" id="ETH0_DHCP_POOL_OFFSET" min="2" max="254" required>
+                        <div class="current-value">Current: <span id="current-ETH0_DHCP_POOL_OFFSET">-</span></div>
+                    </div>
+                    
+                    <div class="config-field">
+                        <label>ETH0_DHCP_POOL_SIZE (Number of DHCP Leases)</label>
+                        <input type="number" name="ETH0_DHCP_POOL_SIZE" id="ETH0_DHCP_POOL_SIZE" min="1" max="200" required>
+                        <div class="current-value">Current: <span id="current-ETH0_DHCP_POOL_SIZE">-</span></div>
+                    </div>
+                    
                     <div class="button-group">
                         <button type="button" class="btn btn-apply" onclick="applyConfig()">Apply Configuration Changes</button>
                     </div>
