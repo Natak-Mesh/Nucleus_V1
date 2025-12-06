@@ -52,3 +52,18 @@ ip -6 addr add $MESH_IPV6_LL/64 dev wlan1
 sleep 2
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+
+# Start rnsd (Reticulum Network Stack Daemon) in background
+nohup runuser -l natak -c 'rnsd' > /var/log/rnsd.log 2>&1 &
+RNSD_PID=$!
+echo "Started rnsd with PID: $RNSD_PID"
+
+# Give rnsd time to initialize
+sleep 2
+
+# Start mediamtx (required for TAKserver video)
+#nohup runuser -l natak -c '/opt/nucleus/bin/mediamtx' > /var/log/mediamtx.log 2>&1 &
+#MEDIAMTX_PID=$!
+#echo "Started mediamtx with PID: $MEDIAMTX_PID"
+
+#sleep 2
